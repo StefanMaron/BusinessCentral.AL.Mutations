@@ -1,0 +1,134 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'app.json'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'app.json'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+env:
+  CONTAINER_NAME: bcmutations
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install BcContainerHelper
+        shell: pwsh
+        run: |
+          Install-Module BcContainerHelper -Force -AllowClobber
+          Import-Module BcContainerHelper
+
+      - name: Create BC Container
+        shell: pwsh
+        run: |
+          $credential = New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force)
+
+          $artifactUrl = Get-BCArtifactUrl -type OnPrem -country w1 -select Latest
+          Write-Host "Using artifact: $artifactUrl"
+
+          New-BcContainer `
+            -containerName $env:CONTAINER_NAME `
+            -accept_eula `
+            -credential $credential `
+            -artifactUrl $artifactUrl `
+            -auth NavUserPassword `
+            -updateHosts `
+            -isolation process `
+            -memoryLimit 8G
+
+      - name: Compile App
+        shell: pwsh
+        run: |
+          $credential = New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force)
+
+          # Check if there are AL files to compile
+          $alFiles = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Filter "*.al" -Recurse
+          if ($alFiles.Count -eq 0) {
+            Write-Host "No AL files found, skipping compilation"
+            exit 0
+          }
+
+          # Create output directory
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE/.output" | Out-Null
+
+          # Compile the app
+          Compile-AppInBcContainer `
+            -containerName $env:CONTAINER_NAME `
+            -appProjectFolder $env:GITHUB_WORKSPACE `
+            -appOutputFolder "$env:GITHUB_WORKSPACE/.output" `
+            -credential $credential `
+            -UpdateSymbols
+
+      - name: Publish App
+        shell: pwsh
+        run: |
+          $appFile = Get-ChildItem -Path "$env:GITHUB_WORKSPACE/.output" -Filter "*.app" | Select-Object -First 1
+          if (-not $appFile) {
+            Write-Host "No app file found, skipping publish"
+            exit 0
+          }
+
+          Write-Host "Publishing app: $($appFile.FullName)"
+
+          Publish-BcContainerApp `
+            -containerName $env:CONTAINER_NAME `
+            -appFile $appFile.FullName `
+            -skipVerification `
+            -sync `
+            -install
+
+      - name: Run Tests
+        shell: pwsh
+        run: |
+          $credential = New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force)
+
+          # Check if there are test codeunits
+          $testFiles = Get-ChildItem -Path "$env:GITHUB_WORKSPACE/tests" -Filter "*.al" -Recurse -ErrorAction SilentlyContinue
+          if (-not $testFiles -or $testFiles.Count -eq 0) {
+            Write-Host "No test files found, skipping tests"
+            exit 0
+          }
+
+          # Run tests
+          $testResults = Run-TestsInBcContainer `
+            -containerName $env:CONTAINER_NAME `
+            -credential $credential `
+            -testSuite "DEFAULT" `
+            -returnTrueIfAllPassed `
+            -extensionId (Get-BcContainerAppInfo -containerName $env:CONTAINER_NAME | Where-Object { $_.Name -eq "BusinessCentral.AL.Mutations" }).AppId
+
+          if (-not $testResults) {
+            throw "Tests failed"
+          }
+
+          Write-Host "All tests passed!"
+
+      - name: Upload Build Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-package
+          path: .output/*.app
+          if-no-files-found: ignore
+
+      - name: Cleanup Container
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-BcContainer -containerName $env:CONTAINER_NAME -ErrorAction SilentlyContinue
