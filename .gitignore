@@ -1,0 +1,20 @@
+# AL Build outputs
+*.app
+*.g.xlf
+.alcache/
+.alpackages/
+.snapshots/
+
+# VS Code
+.vscode/launch.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

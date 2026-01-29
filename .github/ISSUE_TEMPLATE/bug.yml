@@ -1,0 +1,46 @@
+name: Bug Report
+description: Report a bug or issue
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Claude will investigate and fix it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What's happening?
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Call Mutate.Customer(...)
+        2. Chain .Set(...)
+        3. Call .Apply()
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: input
+    id: bc-version
+    attributes:
+      label: BC Version
+      description: Which Business Central version?
+      placeholder: "24.0"
