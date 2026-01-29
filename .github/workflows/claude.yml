@@ -60,9 +60,13 @@ jobs:
 
             Your workflow for new issues:
             1. Comment acknowledging the issue
-            2. Create a feature branch
+            2. Create a feature branch: git checkout -b feature/issue-N-description
             3. Implement using TDD (write tests first)
-            4. Create a PR linking to the issue
+            4. Commit and push: git add -A && git commit -m "..." && git push -u origin HEAD
+            5. MUST create PR using: gh pr create --title "..." --body "..." --base master
+               - Always include "Closes #N" in PR body to auto-close the issue
+
+            IMPORTANT: Always create the PR using `gh pr create`. Do NOT just provide a link.
 
             AL Code Standards:
             - Prefix all objects with "SMC" (Stefan Maron Consulting)
