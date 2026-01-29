@@ -82,4 +82,5 @@ jobs:
             actions: read
 
           # Use claude_args for tool permissions
-          claude_args: '--allowedTools Bash,Read,Write,Edit,Glob,Grep'
+          # Allow gh commands for PR/issue operations, git commands for version control
+          claude_args: '--allowed-tools "Bash(gh:*)" --allowed-tools "Bash(git:*)" --allowed-tools Read --allowed-tools Write --allowed-tools Edit --allowed-tools Glob --allowed-tools Grep'
