@@ -13,7 +13,27 @@ This repository is developed autonomously by Claude. Humans interact through:
 Read these files for full context:
 - `CONCEPT.md` - Product vision and goals
 - `docs/ARCHITECTURE.md` - Technical design decisions
+- `docs/TOOLING.md` - CI/CD setup with BcContainerHelper
 - `docs/API.md` - API documentation (generated)
+
+## Bootstrap Priority
+
+If the project is not yet set up, follow this order:
+
+1. **CI/CD First** - Create `.github/workflows/build.yml` using BcContainerHelper
+   - See `docs/TOOLING.md` for patterns
+   - Use `windows-latest` runner
+   - Container creation, compile, test, cleanup steps
+
+2. **Project Structure** - Create folder structure and initial files
+   - `src/Codeunits/`, `tests/Codeunits/`
+   - `.vscode/launch.json`, `.vscode/settings.json`
+
+3. **Core Interface** - Implement the base mutation pattern
+   - Start with one entity (Customer)
+   - TDD approach
+
+4. **Expand** - Add more entities based on issues
 
 ## Project Structure
 
