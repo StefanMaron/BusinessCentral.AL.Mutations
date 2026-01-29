@@ -2,14 +2,15 @@ name: Claude Developer Agent
 
 on:
   issues:
-    types: [opened, edited, labeled]
+    types: [opened, edited]
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  schedule:
-    # Run autonomous check every 6 hours
-    - cron: '0 */6 * * *'
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [opened, synchronize]
   workflow_dispatch:
     inputs:
       task:
@@ -19,154 +20,76 @@ on:
 
 # Only allow one Claude agent to run at a time
 concurrency:
-  group: claude-agent
+  group: claude-agent-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
-  # Filter job to determine if we should run
-  should-run:
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.check.outputs.run }}
-    steps:
-      - id: check
-        run: |
-          # Always run on workflow_dispatch or schedule
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "run=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # For issues/comments, check if it's from a human (not the bot)
-          ACTOR="${{ github.actor }}"
-          if [[ "$ACTOR" == "github-actions[bot]" ]] || [[ "$ACTOR" == "claude-dev[bot]" ]]; then
-            echo "run=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Check for @claude mention or /claude command in comments
-          COMMENT_BODY="${{ github.event.comment.body }}"
-          ISSUE_BODY="${{ github.event.issue.body }}"
-
-          if [[ "$COMMENT_BODY" == *"@claude"* ]] || [[ "$COMMENT_BODY" == "/claude"* ]] || \
-             [[ "$ISSUE_BODY" == *"@claude"* ]] || [[ "${{ github.event_name }}" == "issues" ]]; then
-            echo "run=true" >> $GITHUB_OUTPUT
-          else
-            echo "run=false" >> $GITHUB_OUTPUT
-          fi
-
   claude-agent:
-    needs: should-run
-    if: needs.should-run.outputs.run == 'true'
+    # Skip if comment is from a bot
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'issues') ||
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested') ||
+      (github.event_name == 'issue_comment' && !github.event.issue.pull_request && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude'))
+
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      id-token: write  # Required for OIDC authentication
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@beta
         with:
-          node-version: '20'
+          # Use the agent prompt as system instructions
+          system_prompt: |
+            You are an autonomous AL developer working on BusinessCentral.AL.Mutations.
 
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
+            Read CONCEPT.md for the product vision and CLAUDE.md for development guidelines.
 
-      - name: Configure Git
-        run: |
-          git config user.name "Claude Developer"
-          git config user.email "claude-dev@users.noreply.github.com"
+            Your workflow:
+            1. Analyze the issue or PR context
+            2. If it's a new issue: comment your plan, create branch, implement with TDD, create PR
+            3. If it's a comment: respond helpfully or implement requested changes
+            4. If it's a PR review: address feedback and push updates
 
-      - name: Prepare context
-        id: context
-        run: |
-          # Build context based on trigger
-          echo "EVENT_NAME=${{ github.event_name }}" >> $GITHUB_ENV
+            AL Code Standards:
+            - Prefix all objects with "SMC" (Stefan Maron Consulting)
+            - Use XML documentation on public procedures
+            - Write tests first (TDD)
+            - Follow fluent interface pattern
 
-          if [[ "${{ github.event_name }}" == "issues" ]]; then
-            echo "ISSUE_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
-            echo "ISSUE_TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
-            # Write issue body to file to handle special characters
-            cat << 'ISSUE_BODY_EOF' > /tmp/issue_body.txt
-          ${{ github.event.issue.body }}
-          ISSUE_BODY_EOF
-          fi
+            Available commands in comments:
+            - @claude implement - Start working on this issue
+            - @claude status - Report progress
+            - @claude help - Explain options
 
-          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            echo "ISSUE_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
-            echo "ISSUE_TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
-            cat << 'COMMENT_BODY_EOF' > /tmp/comment_body.txt
-          ${{ github.event.comment.body }}
-          COMMENT_BODY_EOF
-          fi
+          # Custom instructions for this run
+          custom_instructions: |
+            Focus on the triggered event. Be autonomous but communicate your plans.
+            Create small, focused commits. Always run tests before creating PRs.
 
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "MANUAL_TASK=${{ github.event.inputs.task }}" >> $GITHUB_ENV
-          fi
+          # Allow Claude to use these tools
+          allowed_tools: |
+            Bash
+            Read
+            Write
+            Edit
+            Glob
+            Grep
 
-      - name: Run Claude Agent
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Build the prompt from template
-          PROMPT=$(cat .github/prompts/agent-prompt.md)
+          # Direct Claude to push changes
+          push_changes: true
 
-          # Add context based on trigger
-          if [[ -f /tmp/issue_body.txt ]]; then
-            ISSUE_BODY=$(cat /tmp/issue_body.txt)
-            PROMPT="$PROMPT
-
-          ## Current Issue #$ISSUE_NUMBER: $ISSUE_TITLE
-
-          $ISSUE_BODY"
-          fi
-
-          if [[ -f /tmp/comment_body.txt ]]; then
-            COMMENT_BODY=$(cat /tmp/comment_body.txt)
-            PROMPT="$PROMPT
-
-          ## New Comment on Issue #$ISSUE_NUMBER
-
-          $COMMENT_BODY"
-          fi
-
-          if [[ -n "$MANUAL_TASK" ]]; then
-            PROMPT="$PROMPT
-
-          ## Manual Task
-
-          $MANUAL_TASK"
-          fi
-
-          if [[ "$EVENT_NAME" == "schedule" ]]; then
-            PROMPT="$PROMPT
-
-          ## Scheduled Maintenance Run
-
-          Check for:
-          1. Open issues that need attention
-          2. Stale PRs that need updates
-          3. Failing tests to fix
-          4. Documentation improvements"
-          fi
-
-          # Run Claude with the prompt
-          claude --dangerously-skip-permissions -p "$PROMPT"
-
-      - name: Push changes if any
-        run: |
-          if [[ -n $(git status --porcelain) ]]; then
-            git add -A
-            git status
-            # Changes will be committed by Claude during its run
-            # This is just a safety push in case anything was missed
-            git push || true
-          fi
+          # Create PRs automatically
+          create_pull_request: true
