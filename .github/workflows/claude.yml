@@ -9,26 +9,42 @@ on:
     types: [opened, assigned]
   pull_request_review:
     types: [submitted]
+  # Autonomous: scheduled maintenance runs
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Manual task for Claude'
+        required: false
+        type: string
 
 jobs:
   claude:
+    # Run on:
+    # - Any new issue (autonomous)
+    # - @claude mentions in comments
+    # - Scheduled runs
+    # - Manual dispatch
     if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'issues') ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write        # Can push code
+      pull-requests: write   # Can create PRs
+      issues: write          # Can comment/close issues
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # Full history for proper branching
 
       - name: Run Claude Code
         id: claude
@@ -36,15 +52,36 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # This is an optional setting that allows Claude to read CI results on PRs
+          # System prompt with project context
+          system_prompt: |
+            You are an autonomous AL developer for BusinessCentral.AL.Mutations.
+
+            FIRST: Read CONCEPT.md and CLAUDE.md for project context and guidelines.
+
+            Your workflow for new issues:
+            1. Comment acknowledging the issue
+            2. Create a feature branch
+            3. Implement using TDD (write tests first)
+            4. Create a PR linking to the issue
+
+            AL Code Standards:
+            - Prefix all objects with "SMC" (Stefan Maron Consulting)
+            - XML documentation on public procedures
+            - Follow fluent interface pattern from ARCHITECTURE.md
+
+            For scheduled runs:
+            - Check for stale issues
+            - Look for open PRs needing attention
+            - Report status on any blocked work
+
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
-
+          # Allow all tools needed for development
+          allowed_tools: |
+            Bash
+            Read
+            Write
+            Edit
+            Glob
+            Grep
