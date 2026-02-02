@@ -38,9 +38,49 @@ Mutate.Customer(CustomerNo)
 
 *Coming soon - will be available via AL package*
 
-## Usage
+For now, you can clone this repository and reference it in your AL project.
 
-*Documentation will be added as features are implemented*
+## Quick Start
+
+```al
+codeunit 50200 "My Customer Update"
+{
+    procedure UpdateCustomer(CustomerNo: Code[20])
+    var
+        CustomerMutation: Codeunit "SMC Customer Mutation";
+    begin
+        CustomerMutation.Init(CustomerNo)
+            .SetName('ACME Corporation')
+            .SetAddress('123 Main Street')
+            .SetCity('Seattle')
+            .Apply();
+    end;
+}
+```
+
+## Documentation
+
+- [API Reference](docs/API.md) - Complete API documentation
+- [Usage Examples](docs/EXAMPLES.md) - Real-world usage patterns
+- [Architecture](docs/ARCHITECTURE.md) - Design decisions and internals
+
+## Current Status
+
+**Implemented:**
+- ✅ Core mutation interface (SMC IMutation)
+- ✅ Base mutation implementation
+- ✅ Customer mutations with fluent API
+- ✅ Comprehensive test suite
+- ✅ Full documentation
+
+**In Progress:**
+- ⏳ CI/CD pipeline (pending permissions fix)
+
+**Roadmap:**
+- Vendor mutations
+- Item mutations
+- Sales/Purchase document mutations
+- Package publishing
 
 ## Contributing
 
