@@ -6,7 +6,6 @@ codeunit 50101 "SMC Customer Mutation"
 {
     var
         MutationBase: Codeunit "SMC Mutation Base";
-        CustomerRec: Record Customer;
 
     /// <summary>
     /// Initializes the mutation for a specific customer.
@@ -14,10 +13,11 @@ codeunit 50101 "SMC Customer Mutation"
     /// <param name="CustomerNo">The customer number to mutate.</param>
     procedure Init(CustomerNo: Code[20])
     var
+        Customer: Record Customer;
         RecRef: RecordRef;
     begin
-        CustomerRec.Get(CustomerNo);
-        RecRef.GetTable(CustomerRec);
+        Customer.Get(CustomerNo);
+        RecRef.GetTable(Customer);
         MutationBase.Initialize(RecRef);
     end;
 
@@ -27,8 +27,10 @@ codeunit 50101 "SMC Customer Mutation"
     /// <param name="Name">The name to set.</param>
     /// <returns>The mutation instance for chaining.</returns>
     procedure SetName(Name: Text[100]): Codeunit "SMC Customer Mutation"
+    var
+        Customer: Record Customer;
     begin
-        MutationBase.Set(CustomerRec.FieldNo(Name), Name);
+        MutationBase.Set(Customer.FieldNo(Name), Name);
         exit(this);
     end;
 
@@ -38,8 +40,10 @@ codeunit 50101 "SMC Customer Mutation"
     /// <param name="Address">The address to set.</param>
     /// <returns>The mutation instance for chaining.</returns>
     procedure SetAddress(Address: Text[100]): Codeunit "SMC Customer Mutation"
+    var
+        Customer: Record Customer;
     begin
-        MutationBase.Set(CustomerRec.FieldNo(Address), Address);
+        MutationBase.Set(Customer.FieldNo(Address), Address);
         exit(this);
     end;
 
@@ -49,8 +53,10 @@ codeunit 50101 "SMC Customer Mutation"
     /// <param name="City">The city to set.</param>
     /// <returns>The mutation instance for chaining.</returns>
     procedure SetCity(City: Text[30]): Codeunit "SMC Customer Mutation"
+    var
+        Customer: Record Customer;
     begin
-        MutationBase.Set(CustomerRec.FieldNo(City), City);
+        MutationBase.Set(Customer.FieldNo(City), City);
         exit(this);
     end;
 
@@ -82,11 +88,7 @@ codeunit 50101 "SMC Customer Mutation"
     /// </summary>
     /// <returns>True if the operation succeeded; otherwise, false.</returns>
     procedure Apply(): Boolean
-    var
-        RecRef: RecordRef;
     begin
-        RecRef := MutationBase.GetRecordRef();
-        RecRef.SetTable(CustomerRec);
         exit(MutationBase.Apply());
     end;
 }
