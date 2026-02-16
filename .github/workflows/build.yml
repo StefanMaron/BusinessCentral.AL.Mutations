@@ -45,7 +45,7 @@ jobs:
             -artifactUrl $artifactUrl `
             -auth NavUserPassword `
             -updateHosts `
-            -isolation process `
+            -isolation hyperv `
             -memoryLimit 8G `
             -includeTestToolkit `
             -includeTestLibrariesOnly `
