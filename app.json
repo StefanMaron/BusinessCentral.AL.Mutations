@@ -11,7 +11,14 @@
   "url": "https://github.com/StefanMaron/BusinessCentral.AL.Mutations",
   "contextSensitiveHelpUrl": "https://github.com/StefanMaron/BusinessCentral.AL.Mutations",
   "logo": "",
-  "dependencies": [],
+  "dependencies": [
+    {
+      "id": "dd0be2ea-f733-4d65-bb34-a28f4624fb14",
+      "name": "Library Assert",
+      "publisher": "Microsoft",
+      "version": "22.0.0.0"
+    }
+  ],
   "screenshots": [],
   "platform": "26.0.0.0",
   "application": "26.0.0.0",
