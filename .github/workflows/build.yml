@@ -50,7 +50,8 @@ jobs:
             -auth NavUserPassword `
             -updateHosts `
             -isolation process `
-            -memoryLimit 8G
+            -memoryLimit 8G `
+            -myfolder $env:GITHUB_WORKSPACE
 
       - name: Compile App
         shell: pwsh
