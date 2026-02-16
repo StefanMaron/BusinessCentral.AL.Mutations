@@ -55,18 +55,19 @@ jobs:
         shell: pwsh
         run: |
           $credential = New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force)
-          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE/.output" | Out-Null
+          $outputFolder = Join-Path $env:GITHUB_WORKSPACE ".output"
+          New-Item -ItemType Directory -Force -Path $outputFolder | Out-Null
 
           Compile-AppInBcContainer `
             -containerName "bcmutations" `
             -appProjectFolder $env:GITHUB_WORKSPACE `
-            -appOutputFolder "$env:GITHUB_WORKSPACE/.output" `
+            -appOutputFolder $outputFolder `
             -credential $credential
 
       - name: Publish and Install App
         shell: pwsh
         run: |
-          $appFile = Get-ChildItem -Path "$env:GITHUB_WORKSPACE/.output" -Filter "*.app" | Select-Object -First 1
+          $appFile = Get-ChildItem -Path (Join-Path $env:GITHUB_WORKSPACE ".output") -Filter "*.app" | Select-Object -First 1
           if (-not $appFile) {
             throw "No compiled app file found"
           }
