@@ -31,35 +31,54 @@ jobs:
           Install-Module BcContainerHelper -Force -AllowClobber
           Import-Module BcContainerHelper
 
-      - name: Run AL Pipeline
+      - name: Create BC Container
         shell: pwsh
         run: |
-          # Create output directories
-          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE/.output" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE/.packages" | Out-Null
+          $containerName = "bcmutations"
+          $credential = New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force)
+          $artifactUrl = Get-BCArtifactUrl -type OnPrem -country w1 -select Latest
 
-          # Run the AL pipeline - this handles container creation, compilation, and testing
-          $params = @{
-            pipelineName = "BusinessCentral.AL.Mutations"
-            appFolders = @($env:GITHUB_WORKSPACE)
-            testFolders = @("$env:GITHUB_WORKSPACE/tests")
-            appOutputFolder = "$env:GITHUB_WORKSPACE/.output"
-            containerName = "bcmutations"
-            credential = (New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force))
-            memoryLimit = "8G"
-            doNotRunTests = $false
-            enableCodeCop = $false
-            enableAppSourceCop = $false
-            enablePerTenantExtensionCop = $false
-            enableUICop = $false
-            useDevEndpoint = $false
-            reuseContainer = $false
-            installTestFramework = $true
-            installTestLibraries = $true
-            installPerformanceToolkit = $false
+          New-BcContainer `
+            -containerName $containerName `
+            -accept_eula `
+            -credential $credential `
+            -artifactUrl $artifactUrl `
+            -auth NavUserPassword `
+            -updateHosts `
+            -isolation process `
+            -memoryLimit 8G `
+            -includeTestToolkit `
+            -includeTestLibrariesOnly `
+            -myfolder $env:GITHUB_WORKSPACE
+
+      - name: Compile App
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE/.output" | Out-Null
+
+          Compile-AppInBcContainer `
+            -containerName "bcmutations" `
+            -appProjectFolder $env:GITHUB_WORKSPACE `
+            -appOutputFolder "$env:GITHUB_WORKSPACE/.output" `
+            -credential (New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force))
+
+      - name: Run Tests
+        shell: pwsh
+        run: |
+          $testResults = Run-TestsInBcContainer `
+            -containerName "bcmutations" `
+            -credential (New-Object PSCredential 'admin', (ConvertTo-SecureString 'P@ssw0rd' -AsPlainText -Force)) `
+            -returnTrueIfAllPassed
+
+          if (-not $testResults) {
+            throw "Tests failed"
           }
 
-          Run-AlPipeline @params
+      - name: Cleanup
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-BcContainer -containerName "bcmutations" -ErrorAction SilentlyContinue
 
       - name: Upload Build Artifacts
         if: success()
