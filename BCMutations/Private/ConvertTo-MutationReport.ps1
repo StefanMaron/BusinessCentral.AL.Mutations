@@ -19,6 +19,7 @@ function ConvertTo-MutationReport {
     [OutputType([string])]
     param(
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [PSCustomObject[]]$Results,
 
         [Parameter(Mandatory)]
