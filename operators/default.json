@@ -1,0 +1,180 @@
+{
+  "$schema": "./schema.json",
+  "operators": [
+    {
+      "id": "rel-gt-to-gte",
+      "name": "Greater-than to greater-or-equal",
+      "category": "relational",
+      "pattern": " > ",
+      "replacement": " >= "
+    },
+    {
+      "id": "rel-gte-to-gt",
+      "name": "Greater-or-equal to greater-than",
+      "category": "relational",
+      "pattern": " >= ",
+      "replacement": " > "
+    },
+    {
+      "id": "rel-lt-to-lte",
+      "name": "Less-than to less-or-equal",
+      "category": "relational",
+      "pattern": " < ",
+      "replacement": " <= "
+    },
+    {
+      "id": "rel-lte-to-lt",
+      "name": "Less-or-equal to less-than",
+      "category": "relational",
+      "pattern": " <= ",
+      "replacement": " < "
+    },
+    {
+      "id": "rel-eq-to-neq",
+      "name": "Equal to not-equal",
+      "category": "relational",
+      "pattern": " = ",
+      "replacement": " <> "
+    },
+    {
+      "id": "rel-neq-to-eq",
+      "name": "Not-equal to equal",
+      "category": "relational",
+      "pattern": " <> ",
+      "replacement": " = "
+    },
+    {
+      "id": "arith-add-to-sub",
+      "name": "Addition to subtraction",
+      "category": "arithmetic",
+      "pattern": " + ",
+      "replacement": " - "
+    },
+    {
+      "id": "arith-sub-to-add",
+      "name": "Subtraction to addition",
+      "category": "arithmetic",
+      "pattern": " - ",
+      "replacement": " + "
+    },
+    {
+      "id": "arith-mul-to-div",
+      "name": "Multiplication to division",
+      "category": "arithmetic",
+      "pattern": " * ",
+      "replacement": " / "
+    },
+    {
+      "id": "arith-div-to-mul",
+      "name": "Division to multiplication",
+      "category": "arithmetic",
+      "pattern": " / ",
+      "replacement": " * "
+    },
+    {
+      "id": "logic-and-to-or",
+      "name": "And to or",
+      "category": "logical",
+      "pattern": " and ",
+      "replacement": " or "
+    },
+    {
+      "id": "logic-or-to-and",
+      "name": "Or to and",
+      "category": "logical",
+      "pattern": " or ",
+      "replacement": " and "
+    },
+    {
+      "id": "bool-true-to-false",
+      "name": "True to false",
+      "category": "boolean",
+      "pattern": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bool-false-to-true",
+      "name": "False to true",
+      "category": "boolean",
+      "pattern": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "stmt-remove-modify",
+      "name": "Remove Modify call",
+      "category": "statement-removal",
+      "pattern": ".Modify(",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-insert",
+      "name": "Remove Insert call",
+      "category": "statement-removal",
+      "pattern": ".Insert(",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-delete",
+      "name": "Remove Delete call",
+      "category": "statement-removal",
+      "pattern": ".Delete(",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-validate",
+      "name": "Remove Validate call",
+      "category": "statement-removal",
+      "pattern": ".Validate(",
+      "replacement": null
+    },
+    {
+      "id": "boundary-off-by-one-plus",
+      "name": "Off-by-one: add 1",
+      "category": "boundary",
+      "pattern": " + 1",
+      "replacement": " + 2"
+    },
+    {
+      "id": "boundary-off-by-one-minus",
+      "name": "Off-by-one: subtract 1",
+      "category": "boundary",
+      "pattern": " - 1",
+      "replacement": " - 2"
+    },
+    {
+      "id": "ctrl-if-negate",
+      "name": "Negate if condition (not)",
+      "category": "control-flow",
+      "pattern": "if ",
+      "replacement": "if not "
+    },
+    {
+      "id": "bc-modify-trigger-true",
+      "name": "Modify(true) to Modify(false)",
+      "category": "bc-specific",
+      "pattern": ".Modify(true)",
+      "replacement": ".Modify(false)"
+    },
+    {
+      "id": "bc-modify-trigger-false",
+      "name": "Modify(false) to Modify(true)",
+      "category": "bc-specific",
+      "pattern": ".Modify(false)",
+      "replacement": ".Modify(true)"
+    },
+    {
+      "id": "bc-insert-trigger-true",
+      "name": "Insert(true) to Insert(false)",
+      "category": "bc-specific",
+      "pattern": ".Insert(true)",
+      "replacement": ".Insert(false)"
+    },
+    {
+      "id": "bc-delete-trigger-true",
+      "name": "Delete(true) to Delete(false)",
+      "category": "bc-specific",
+      "pattern": ".Delete(true)",
+      "replacement": ".Delete(false)"
+    }
+  ]
+}

@@ -1,12 +1,11 @@
-# AL Build outputs
-*.app
-*.g.xlf
-.alcache/
-.alpackages/
-.snapshots/
+# PowerShell output
+.output/
+mutation-report/
 
-# VS Code
-.vscode/launch.json
+# Test results
+coverage.xml
+test-results.xml
+TestResults/
 
 # OS
 .DS_Store
