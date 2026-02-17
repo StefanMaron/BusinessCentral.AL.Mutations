@@ -1,7 +1,11 @@
 # BCMutations.psm1 - Module loader
 
-$Public = @(Get-ChildItem -Path "$PSScriptRoot\Public\*.ps1" -ErrorAction SilentlyContinue)
-$Private = @(Get-ChildItem -Path "$PSScriptRoot\Private\*.ps1" -ErrorAction SilentlyContinue)
+# Module root directory (used for locating bundled resources like operators/)
+$script:ModuleRoot = $PSScriptRoot
+$script:DefaultOperatorFile = Join-Path (Split-Path $PSScriptRoot -Parent) 'operators' 'default.json'
+
+$Public = @(Get-ChildItem -Path "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue)
+$Private = @(Get-ChildItem -Path "$PSScriptRoot/Private/*.ps1" -ErrorAction SilentlyContinue)
 
 foreach ($import in @($Private + $Public)) {
     try {

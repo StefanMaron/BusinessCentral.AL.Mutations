@@ -26,8 +26,13 @@ function Get-BCMutationOperators {
     )
 
     if (-not $OperatorFile) {
-        $OperatorFile = Join-Path $PSScriptRoot '../../operators/default.json'
-        $OperatorFile = (Resolve-Path $OperatorFile).Path
+        $OperatorFile = $script:DefaultOperatorFile
+        if (-not $OperatorFile -or -not (Test-Path $OperatorFile)) {
+            $OperatorFile = Join-Path $PSScriptRoot '../../operators/default.json'
+        }
+        if (Test-Path $OperatorFile) {
+            $OperatorFile = (Resolve-Path $OperatorFile).Path
+        }
     }
 
     $operators = Read-OperatorFile -Path $OperatorFile

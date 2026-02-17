@@ -54,6 +54,23 @@ Describe 'Test-LineContext' {
             $result = Test-LineContext -Line $line -Position $pos -PrecedingText ''
             $result | Should -Be $false
         }
+
+        It 'handles escaped single quotes (doubled) inside AL strings' {
+            # In AL, single quotes are escaped by doubling: 'It''s > 0'
+            # The > should still be detected as inside the string
+            $line = "Msg := 'It''s > 0';"
+            $pos = $line.IndexOf('>')
+            $result = Test-LineContext -Line $line -Position $pos -PrecedingText ''
+            $result | Should -Be $true
+        }
+
+        It 'returns False for operator after a string with escaped quotes' {
+            # Code after string with escaped quotes should be normal code
+            $line = "if Msg <> 'It''s' then Amount > 0"
+            $pos = $line.LastIndexOf('>')
+            $result = Test-LineContext -Line $line -Position $pos -PrecedingText ''
+            $result | Should -Be $false
+        }
     }
 
     Context 'inside block comments' {

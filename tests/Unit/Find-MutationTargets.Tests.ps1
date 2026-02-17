@@ -69,5 +69,18 @@ Describe 'Find-MutationTargets' {
             $result = Find-MutationTargets -FilePath $sampleFile -Operators @()
             $result | Should -BeNullOrEmpty
         }
+
+        It 'handles single-line AL files correctly' {
+            $result = Find-MutationTargets -FilePath "$fixturesPath/SingleLine.al" -Operators $operators
+            $result | Should -Not -BeNullOrEmpty
+            $gtTargets = $result | Where-Object { $_.Operator.id -eq 'rel-gt-to-gte' }
+            $gtTargets.Count | Should -Be 1
+            $gtTargets[0].Line | Should -Be 1
+        }
+
+        It 'returns empty array for an empty file' {
+            $result = Find-MutationTargets -FilePath "$fixturesPath/Empty.al" -Operators $operators
+            $result | Should -BeNullOrEmpty
+        }
     }
 }

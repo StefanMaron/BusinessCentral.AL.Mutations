@@ -32,7 +32,7 @@ function Find-MutationTargets {
         return @()
     }
 
-    $lines = Get-Content -LiteralPath $FilePath
+    $lines = @(Get-Content -LiteralPath $FilePath)
     $targets = [System.Collections.Generic.List[PSCustomObject]]::new()
     $precedingText = [System.Text.StringBuilder]::new()
 

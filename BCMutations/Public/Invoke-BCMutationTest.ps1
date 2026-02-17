@@ -74,8 +74,14 @@ function Invoke-BCMutationTest {
 
     # Load operator file
     if (-not $OperatorFile) {
-        $OperatorFile = Join-Path $PSScriptRoot '../../operators/default.json'
-        $OperatorFile = (Resolve-Path $OperatorFile).Path
+        $OperatorFile = $script:DefaultOperatorFile
+        if (-not $OperatorFile -or -not (Test-Path $OperatorFile)) {
+            # Fallback: resolve relative to script location
+            $OperatorFile = Join-Path $PSScriptRoot '../../operators/default.json'
+        }
+        if (Test-Path $OperatorFile) {
+            $OperatorFile = (Resolve-Path $OperatorFile).Path
+        }
     }
 
     Write-Host "Loading operators from: $OperatorFile"
@@ -105,7 +111,9 @@ function Invoke-BCMutationTest {
 
     if ($MaxMutants -gt 0 -and $allTargets.Count -gt $MaxMutants) {
         Write-Host "Limiting to $MaxMutants mutants (MaxMutants parameter)."
-        $allTargets = [System.Collections.Generic.List[PSCustomObject]]($allTargets | Select-Object -First $MaxMutants)
+        $limited = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $allTargets | Select-Object -First $MaxMutants | ForEach-Object { $limited.Add($_) }
+        $allTargets = $limited
     }
 
     if ($DryRun) {
@@ -135,10 +143,13 @@ function Invoke-BCMutationTest {
     try {
         # Phase 4: Baseline
         Write-Host "Compiling baseline..."
-        $baselineCompiled = Invoke-AppCompile -ContainerName $ContainerName -ProjectPath $projectPath
-        if (-not $baselineCompiled) {
+        $baselineAppFile = Invoke-AppCompile -ContainerName $ContainerName -ProjectPath $projectPath
+        if (-not $baselineAppFile) {
             throw "Baseline compilation failed. Fix compilation errors before running mutation testing."
         }
+
+        Write-Host "Deploying baseline..."
+        Invoke-AppDeploy -ContainerName $ContainerName -AppFile $baselineAppFile
 
         Write-Host "Running baseline tests..."
         $baselinePassed = Invoke-TestRun -ContainerName $ContainerName -TestSuite $TestSuite
@@ -166,10 +177,11 @@ function Invoke-BCMutationTest {
             try {
                 New-Mutation -Mutation $mutation
 
-                $compiled = Invoke-AppCompile -ContainerName $ContainerName -ProjectPath $projectPath
-                if (-not $compiled) {
+                $appFile = Invoke-AppCompile -ContainerName $ContainerName -ProjectPath $projectPath
+                if (-not $appFile) {
                     $status = 'CompileError'
                 } else {
+                    Invoke-AppDeploy -ContainerName $ContainerName -AppFile $appFile
                     $passed = Invoke-TestRun -ContainerName $ContainerName -TestSuite $TestSuite
                     $status = if (-not $passed) { 'Killed' } else { 'Survived' }
                 }
