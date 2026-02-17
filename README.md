@@ -1,86 +1,83 @@
 # BusinessCentral.AL.Mutations
 
-A type-safe, chainable mutation helper for Microsoft Dynamics 365 Business Central.
+Mutation testing for Microsoft Dynamics 365 Business Central AL code.
 
 > **Note**: This project is developed autonomously by Claude. Create an issue to request features or report bugs!
 
-## Vision
+## What Is This?
 
-Replace verbose field-by-field record modifications with a clean, fluent API:
+A tool that validates the quality of your AL test suites by introducing small code changes
+(mutations) and checking whether your tests catch them.
 
-```al
-// Before: Verbose and error-prone
-Customer.Get(CustomerNo);
-Customer.Name := 'New Name';
-Customer.Address := '123 Main St';
-Customer.City := 'Seattle';
-Customer.Validate("Payment Terms Code", '30 DAYS');
-Customer.Modify(true);
+- **Mutation killed** = your tests detected the change (good)
+- **Mutation survived** = your tests missed the change (test gap)
 
-// After: Clean and chainable
-Mutate.Customer(CustomerNo)
-    .Set(Name, 'New Name')
-    .Set(Address, '123 Main St')
-    .Set(City, 'Seattle')
-    .Validate("Payment Terms Code", '30 DAYS')
-    .Apply();
+```powershell
+# Run mutation testing on your AL project
+Invoke-BCMutationTest -ProjectPath ./MyBCExtension
+
+# Mutation Score: 75.0% (30 killed, 10 survived)
 ```
 
-## Features
+## How It Works
 
-- **Fluent API** - Chainable method calls
-- **Type Safety** - Compile-time validation
-- **Auto-Modify** - Handles Get/Modify lifecycle
-- **Batch Operations** - Efficient bulk mutations
-- **Validation Support** - Built-in Validate() handling
+1. Spins up a BC container (once)
+2. Compiles and tests your unmodified code (baseline must pass)
+3. For each mutation: modify source -> compile -> deploy -> test -> restore
+4. Reports which mutations survived (your test gaps)
+5. Cleans up the container
 
-## Installation
+## Mutation Operators
 
-*Coming soon - will be available via AL package*
+Operators are defined as simple JSON token pairs:
 
-For now, you can clone this repository and reference it in your AL project.
+| Category | Example | What It Tests |
+|---|---|---|
+| Relational | `>` to `>=` | Boundary conditions |
+| Arithmetic | `+` to `-` | Math correctness |
+| Logical | `and` to `or` | Condition logic |
+| Boolean | `true` to `false` | Flag handling |
+| Statement removal | delete `Modify(...)` | Side effects are needed |
+| BC-specific | `Modify(true)` to `Modify(false)` | Trigger execution |
 
-## Quick Start
+Custom operators can be defined in a JSON file. See [Operators Guide](docs/OPERATORS.md).
 
-```al
-codeunit 50200 "My Customer Update"
-{
-    procedure UpdateCustomer(CustomerNo: Code[20])
-    var
-        CustomerMutation: Codeunit "SMC Customer Mutation";
-    begin
-        CustomerMutation.Init(CustomerNo)
-            .SetName('ACME Corporation')
-            .SetAddress('123 Main Street')
-            .SetCity('Seattle')
-            .Apply();
-    end;
-}
+## Usage
+
+### CLI
+
+```powershell
+Import-Module ./BCMutations
+
+# Full run
+Invoke-BCMutationTest -ProjectPath ./MyBCExtension
+
+# Dry run (list mutations without executing)
+Invoke-BCMutationTest -ProjectPath ./MyBCExtension -DryRun
+
+# Custom operators and report format
+Invoke-BCMutationTest -ProjectPath ./MyBCExtension -OperatorFile ./my-operators.json -ReportFormat markdown
+```
+
+### GitHub Action
+
+```yaml
+- uses: StefanMaron/BusinessCentral.AL.Mutations@v1
+  with:
+    project-path: '.'
+    report-format: 'markdown'
 ```
 
 ## Documentation
 
-- [API Reference](docs/API.md) - Complete API documentation
-- [Usage Examples](docs/EXAMPLES.md) - Real-world usage patterns
-- [Architecture](docs/ARCHITECTURE.md) - Design decisions and internals
+- [Concept](CONCEPT.md) - Product vision and goals
+- [Architecture](docs/ARCHITECTURE.md) - Technical design and execution flow
+- [Usage Guide](docs/USAGE.md) - Detailed usage instructions
+- [Operators Guide](docs/OPERATORS.md) - Writing custom mutation operators
 
 ## Current Status
 
-**Implemented:**
-- ✅ Core mutation interface (SMC IMutation)
-- ✅ Base mutation implementation
-- ✅ Customer mutations with fluent API
-- ✅ Comprehensive test suite
-- ✅ Full documentation
-
-**In Progress:**
-- ⏳ CI/CD pipeline (pending permissions fix)
-
-**Roadmap:**
-- Vendor mutations
-- Item mutations
-- Sales/Purchase document mutations
-- Package publishing
+**In development** - This project is being rebuilt as a PowerShell mutation testing tool.
 
 ## Contributing
 
@@ -91,12 +88,7 @@ This project uses an AI-first development model:
 3. **Review PR** - Human reviews and approves
 4. **Merged!** - Feature ships
 
-### Commands in Issues
-
-- `@claude` or `/claude` - Get Claude's attention
-- `/implement` - Ask Claude to start implementing
-- `/status` - Get progress update
-- `/plan` - See implementation plan
+Mention `@claude` in an issue or comment to get Claude's attention.
 
 ## License
 

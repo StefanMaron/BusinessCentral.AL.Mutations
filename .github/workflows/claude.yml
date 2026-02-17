@@ -50,28 +50,36 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
+          model: 'claude-opus-4-5-20250929'
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # Prompt with project context (use 'prompt' not 'system_prompt')
           prompt: |
-            You are an autonomous AL developer for BusinessCentral.AL.Mutations.
+            You are an autonomous developer for BusinessCentral.AL.Mutations.
 
             FIRST: Read CONCEPT.md and CLAUDE.md for project context and guidelines.
+            Also read docs/ARCHITECTURE.md for technical design details.
+
+            This project is a MUTATION TESTING TOOL for Business Central AL code.
+            It is a PowerShell module that modifies AL source files, compiles and tests
+            them in a BC container, and reports which mutations were detected by tests.
+
+            It is NOT an AL library. The tool itself is written in PowerShell with Pester tests.
 
             Your workflow for new issues:
             1. Comment acknowledging the issue
             2. Create a feature branch: git checkout -b feature/issue-N-description
-            3. Implement using TDD (write tests first)
+            3. Implement using TDD (write Pester tests first)
             4. Commit and push: git add -A && git commit -m "..." && git push -u origin HEAD
             5. MUST create PR using: gh pr create --title "..." --body "..." --base master
                - Always include "Closes #N" in PR body to auto-close the issue
 
             IMPORTANT: Always create the PR using `gh pr create`. Do NOT just provide a link.
 
-            AL Code Standards:
-            - Prefix all objects with "SMC" (Stefan Maron Consulting)
-            - XML documentation on public procedures
-            - Follow fluent interface pattern from ARCHITECTURE.md
+            PowerShell Standards:
+            - Use approved PowerShell verbs
+            - Public functions: Verb-BCMutation* naming
+            - Follow module best practices (Public/Private split)
+            - Write Pester tests for every function
 
             For scheduled runs:
             - Check for stale issues
@@ -81,6 +89,4 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Use claude_args for tool permissions
-          # Allow gh commands for PR/issue operations, git commands for version control
           claude_args: '--allowed-tools "Bash(gh:*)" --allowed-tools "Bash(git:*)" --allowed-tools Read --allowed-tools Write --allowed-tools Edit --allowed-tools Glob --allowed-tools Grep'
