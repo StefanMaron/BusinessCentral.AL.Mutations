@@ -50,7 +50,6 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
-          model: 'claude-opus-4-5-20250929'
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
           prompt: |
@@ -89,4 +88,4 @@ jobs:
           additional_permissions: |
             actions: read
 
-          claude_args: '--allowed-tools "Bash(gh:*)" --allowed-tools "Bash(git:*)" --allowed-tools Read --allowed-tools Write --allowed-tools Edit --allowed-tools Glob --allowed-tools Grep'
+          claude_args: '--model claude-opus-4-5-20250929 --allowed-tools "Bash(gh:*)" --allowed-tools "Bash(git:*)" --allowed-tools Read --allowed-tools Write --allowed-tools Edit --allowed-tools Glob --allowed-tools Grep'
