@@ -113,6 +113,9 @@ Describe 'Restore-Mutation' {
             $backupFile2 = "$testFile2.bak"
             Copy-Item -Path $testFile2 -Destination $backupFile2
 
+            # Save the original content before modifying
+            $expectedContent = Get-Content -Path $testFile2 -Raw
+
             # Modify the file
             Set-Content -Path $testFile2 -Value 'MODIFIED CONTENT'
 
@@ -120,7 +123,7 @@ Describe 'Restore-Mutation' {
             Restore-Mutation -FilePath $testFile2
 
             $restored = Get-Content -Path $testFile2 -Raw
-            $restored | Should -Be (Get-Content -Path $backupFile2 -Raw)
+            $restored | Should -Be $expectedContent
         }
 
         It 'removes the backup file after restore' {

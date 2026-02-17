@@ -78,7 +78,7 @@ function ConvertTo-MutationReport {
             [void]$sb.AppendLine()
             foreach ($r in $survived) {
                 $file = Split-Path $r.Mutation.File -Leaf
-                [void]$sb.AppendLine("- **$($r.Mutation.Operator.id)** @ ``$file:$($r.Mutation.Line)``")
+                [void]$sb.AppendLine("- **$($r.Mutation.Operator.id)** @ ``${file}:$($r.Mutation.Line)``")
                 [void]$sb.AppendLine("  - Original: ``$($r.Mutation.OriginalLine.Trim())``")
             }
             [void]$sb.AppendLine()
@@ -90,7 +90,7 @@ function ConvertTo-MutationReport {
             [void]$sb.AppendLine()
             foreach ($r in $killed) {
                 $file = Split-Path $r.Mutation.File -Leaf
-                [void]$sb.AppendLine("- **$($r.Mutation.Operator.id)** @ ``$file:$($r.Mutation.Line)``")
+                [void]$sb.AppendLine("- **$($r.Mutation.Operator.id)** @ ``${file}:$($r.Mutation.Line)``")
             }
             [void]$sb.AppendLine("</details>")
         }
