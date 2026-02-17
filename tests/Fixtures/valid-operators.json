@@ -1,0 +1,25 @@
+{
+  "operators": [
+    {
+      "id": "rel-gt-to-gte",
+      "name": "Greater-than to greater-or-equal",
+      "category": "relational",
+      "pattern": " > ",
+      "replacement": " >= "
+    },
+    {
+      "id": "logic-and-to-or",
+      "name": "And to or",
+      "category": "logical",
+      "pattern": " and ",
+      "replacement": " or "
+    },
+    {
+      "id": "stmt-remove-modify",
+      "name": "Remove Modify call",
+      "category": "statement-removal",
+      "pattern": ".Modify(",
+      "replacement": null
+    }
+  ]
+}

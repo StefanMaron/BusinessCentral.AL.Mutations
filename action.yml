@@ -1,0 +1,69 @@
+name: 'BCMutations - AL Mutation Testing'
+description: 'Run mutation testing on your Business Central AL project to measure test quality'
+author: 'StefanMaron'
+
+inputs:
+  project-path:
+    description: 'Path to your AL project root (must contain app.json)'
+    required: true
+    default: '.'
+  source-folder:
+    description: 'Subfolder containing .al source files'
+    required: false
+    default: 'src'
+  operator-file:
+    description: 'Path to custom operator JSON file'
+    required: false
+    default: ''
+  container-name:
+    description: 'Name for the BC container'
+    required: false
+    default: 'bcmutations'
+  test-suite:
+    description: 'Name of the test suite to run'
+    required: false
+    default: 'DEFAULT'
+  report-format:
+    description: 'Report format: json or markdown'
+    required: false
+    default: 'json'
+  max-mutants:
+    description: 'Maximum number of mutants to test (0 = unlimited)'
+    required: false
+    default: '0'
+  artifact-url:
+    description: 'BC artifact URL for container creation'
+    required: false
+    default: ''
+
+outputs:
+  mutation-score:
+    description: 'Mutation score percentage (killed / (killed + survived))'
+  report-path:
+    description: 'Path to the generated report file'
+  killed:
+    description: 'Number of killed mutants'
+  survived:
+    description: 'Number of survived mutants'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run BCMutations
+      shell: pwsh
+      run: |
+        ${{ github.action_path }}/entrypoint.ps1 `
+          -ProjectPath '${{ inputs.project-path }}' `
+          -SourceFolder '${{ inputs.source-folder }}' `
+          -OperatorFile '${{ inputs.operator-file }}' `
+          -ContainerName '${{ inputs.container-name }}' `
+          -TestSuite '${{ inputs.test-suite }}' `
+          -ReportFormat '${{ inputs.report-format }}' `
+          -MaxMutants ${{ inputs.max-mutants }} `
+          -ArtifactUrl '${{ inputs.artifact-url }}'
+      env:
+        GITHUB_OUTPUT: ${{ env.GITHUB_OUTPUT }}
+
+branding:
+  icon: 'zap'
+  color: 'orange'
