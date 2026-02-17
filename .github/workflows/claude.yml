@@ -40,6 +40,7 @@ jobs:
       issues: write          # Can comment/close issues
       id-token: write
       actions: read
+      workflows: write       # Can push branches containing workflow files
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
