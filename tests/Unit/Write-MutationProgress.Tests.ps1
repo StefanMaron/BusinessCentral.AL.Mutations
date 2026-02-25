@@ -4,9 +4,9 @@ BeforeAll {
 
 Describe 'Write-MutationProgress' {
     BeforeEach {
-        # Capture Write-Host output by mocking it
+        # Capture Write-Host output by mocking it with named parameter
         $script:capturedOutput = @()
-        Mock Write-Host { $script:capturedOutput += $args[0] }
+        Mock Write-Host { param($Object) $script:capturedOutput += $Object }
     }
 
     Context 'output formatting' {
