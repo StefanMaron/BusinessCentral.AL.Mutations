@@ -48,5 +48,5 @@ function Write-MutationProgress {
     }
 
     $pct = [math]::Round(($Current / $Total) * 100)
-    Write-Host "[$Current/$Total $pct%] $statusSymbol $MutationId @ $fileName:$LineNumber"
+    Write-Host "[$Current/$Total $pct%] $statusSymbol $MutationId @ ${fileName}:$LineNumber"
 }
