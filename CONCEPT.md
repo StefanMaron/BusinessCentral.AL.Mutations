@@ -27,31 +27,32 @@ your tests should fail. If they don't, your tests never exercise the boundary co
 
 ## Solution
 
-```powershell
-# Run mutation testing on your AL project
-Invoke-BCMutationTest -ProjectPath ./MyBCExtension
+```bash
+# Scan for mutation candidates (dry run)
+al-mutate scan ./src
+
+# Run full mutation testing
+al-mutate run ./src --tests ./test/MyApp.test.app
 
 # Output:
-# Mutation Score: 75.0% (30 killed, 10 survived)
-# See mutation-report/report.json for details
+# Mutation Score: 75.00% (30 killed, 10 survived)
+# Report written to report.md
 ```
 
 The tool:
-1. Spins up a BC container (once)
+1. Parses AL source files using tree-sitter (full AST — no text pattern noise)
 2. Compiles and tests your unmodified code (baseline)
-3. For each mutation: modify source -> compile -> deploy -> test -> restore
+3. For each mutation: modify source → compile → deploy → test → restore via git
 4. Reports which mutations survived (test gaps)
-5. Cleans up the container
 
 ## Core Features
 
-1. **Configurable Operators** - Mutation operators defined in JSON as simple token pairs
-2. **Single Container Loop** - One expensive container creation, fast mutation iterations
-3. **Context-Aware** - Skips mutations inside comments and string literals
-4. **Multiple Report Formats** - JSON, Markdown, HTML
-5. **GitHub Action** - Run mutation testing in CI/CD pipelines
-6. **CLI Tool** - Run locally during development
-7. **Dry Run Mode** - List mutations without executing
+1. **AST-based targeting** — Uses tree-sitter-al to parse AL code, targeting specific node types. No false positives from object properties, attributes, or comments.
+2. **Configurable operators** — Mutation operators defined in JSON targeting AST node types
+3. **Context-free by design** — Tree-sitter inherently distinguishes executable code from metadata
+4. **Append-only mutation log** — Results persist across runs in `mutations.json`
+5. **Replay survivors** — Re-test previously-survived mutations after writing new tests
+6. **CLI tool** — Run locally during development
 
 ## Mutation Operator Categories
 
@@ -60,40 +61,46 @@ The tool:
 | Relational | `>` to `>=` | Boundary conditions |
 | Arithmetic | `+` to `-` | Math correctness |
 | Logical | `and` to `or` | Condition logic |
-| Boolean | `true` to `false` | Flag handling |
-| Statement removal | delete `Modify(...)` | Side effects are needed |
+| Statement removal | comment out `Modify(...)` | Side effects are needed |
 | BC-specific | `Modify(true)` to `Modify(false)` | Trigger execution |
 
-Operators are defined as simple JSON token pairs:
+Operators target tree-sitter node types:
 ```json
 {
   "operators": [
-    { "id": "rel-gt-to-gte", "category": "relational", "pattern": " > ", "replacement": " >= " },
-    { "id": "stmt-remove-modify", "category": "statement-removal", "pattern": ".Modify(", "replacement": null }
+    {
+      "id": "rel-gt-to-gte",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": ">",
+      "replacement": ">="
+    }
   ]
 }
 ```
 
 ## Technical Approach
 
-- PowerShell module (fits BC ecosystem, BcContainerHelper is PowerShell)
-- BcContainerHelper for container lifecycle, compilation, deployment, testing
-- Pester for testing the tool itself
-- GitHub Action (composite) for CI/CD integration
+- **Python CLI** (`al-mutate` command)
+- **tree-sitter-al** for AST parsing — no text pattern matching
+- **`al-compile` + `bc-publish`** for compile and deploy
+- **`/opt/bc-linux/scripts/run-tests.sh`** for test execution
+- **`git checkout -- <file>`** for mutation restore
+- **pytest** for testing the tool itself
 
 ## Success Criteria
 
-- [ ] PowerShell module with `Invoke-BCMutationTest` command
-- [ ] Default operator set covering relational, arithmetic, logical, boolean, statement removal, BC-specific
-- [ ] Context filtering (skip comments and strings)
-- [ ] JSON + Markdown report output
-- [ ] GitHub Action wrapper
-- [ ] Pester test suite for the tool
+- [x] Python CLI with `al-mutate` command
+- [x] Default operator set covering relational, arithmetic, logical, statement removal, BC-specific
+- [x] AST-based targeting via tree-sitter (replaces text pattern matching)
+- [x] Markdown report output
+- [x] Mutation log with replay support
+- [x] pytest test suite for the tool
 - [ ] Documentation with usage examples
+- [ ] CI workflow
 
 ## Non-Goals (v1)
 
-- Full AL parser (simple context detection is sufficient)
 - Parallel mutation execution (single-threaded loop is fine for v1)
-- HTML report viewer (JSON + Markdown covers reporting needs)
+- HTML report viewer (Markdown covers reporting needs)
 - Equivalent mutant detection (report all survivors, let user decide)

@@ -1,1 +1,0 @@
-if Amount > 0 then exit(true);

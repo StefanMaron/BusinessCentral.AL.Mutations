@@ -1,101 +1,79 @@
 # Mutation Operators
 
-Mutation operators define what code changes (mutations) BCMutations will introduce into your AL source files.
+Mutation operators define what code changes al-mutate will introduce into your AL source files.
+Operators target specific tree-sitter AST node types, ensuring mutations only apply to
+executable code.
 
 ## Default Operators
 
-BCMutations ships with a comprehensive set of default operators covering the most common mutation categories.
+al-mutate ships with a comprehensive set of default operators.
 
 ### Relational Operators
 
-These test boundary conditions in your AL code.
+Target: `comparison_expression` nodes. Test boundary conditions.
 
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `rel-gt-to-gte` | ` > ` | ` >= ` | Off-by-one at boundaries |
-| `rel-gte-to-gt` | ` >= ` | ` > ` | Off-by-one at boundaries |
-| `rel-lt-to-lte` | ` < ` | ` <= ` | Off-by-one at boundaries |
-| `rel-lte-to-lt` | ` <= ` | ` < ` | Off-by-one at boundaries |
-| `rel-eq-to-neq` | ` = ` | ` <> ` | Equality checks |
-| `rel-neq-to-eq` | ` <> ` | ` = ` | Inequality checks |
+| ID | Token | Replacement | Tests |
+|----|-------|-------------|-------|
+| `rel-gt-to-gte` | `>` | `>=` | Off-by-one at boundaries |
+| `rel-gte-to-gt` | `>=` | `>` | Off-by-one at boundaries |
+| `rel-lt-to-lte` | `<` | `<=` | Off-by-one at boundaries |
+| `rel-lte-to-lt` | `<=` | `<` | Off-by-one at boundaries |
+| `rel-eq-to-neq` | `=` | `<>` | Equality checks |
+| `rel-neq-to-eq` | `<>` | `=` | Inequality checks |
 
 ### Arithmetic Operators
 
-These test mathematical correctness.
+Target: `additive_expression` and `multiplicative_expression` nodes.
 
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `arith-add-to-sub` | ` + ` | ` - ` | Addition logic |
-| `arith-sub-to-add` | ` - ` | ` + ` | Subtraction logic |
-| `arith-mul-to-div` | ` * ` | ` / ` | Multiplication logic |
-| `arith-div-to-mul` | ` / ` | ` * ` | Division logic |
+| ID | Token | Replacement | Tests |
+|----|-------|-------------|-------|
+| `arith-add-to-sub` | `+` | `-` | Addition logic |
+| `arith-sub-to-add` | `-` | `+` | Subtraction logic |
+| `arith-mul-to-div` | `*` | `/` | Multiplication logic |
+| `arith-div-to-mul` | `/` | `*` | Division logic |
 
 ### Logical Operators
 
-These test condition logic.
+Target: `logical_expression` nodes.
 
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `logic-and-to-or` | ` and ` | ` or ` | Compound conditions |
-| `logic-or-to-and` | ` or ` | ` and ` | Compound conditions |
-
-### Boolean Operators
-
-These test flag handling.
-
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `bool-true-to-false` | `true` | `false` | Boolean flags |
-| `bool-false-to-true` | `false` | `true` | Boolean flags |
+| ID | Token | Replacement | Tests |
+|----|-------|-------------|-------|
+| `logic-and-to-or` | `and` | `or` | Compound conditions |
+| `logic-or-to-and` | `or` | `and` | Compound conditions |
 
 ### Statement Removal
 
-These test that important side effects (writes, validations) are actually needed.
-When replacement is `null`, the entire line is commented out.
+Target: `call_expression` nodes. Comments out the entire statement.
 
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `stmt-remove-modify` | `.Modify(` | (line commented out) | Record modifications are needed |
-| `stmt-remove-insert` | `.Insert(` | (line commented out) | Record insertions are needed |
-| `stmt-remove-delete` | `.Delete(` | (line commented out) | Record deletions are needed |
-| `stmt-remove-validate` | `.Validate(` | (line commented out) | Field validations are needed |
-
-### Boundary Operators
-
-These test off-by-one errors in numeric calculations.
-
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `boundary-off-by-one-plus` | ` + 1` | ` + 2` | Exact boundary values |
-| `boundary-off-by-one-minus` | ` - 1` | ` - 2` | Exact boundary values |
-
-### Control Flow Operators
-
-These test conditional logic.
-
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `ctrl-if-negate` | `if ` | `if not ` | Conditions are correct |
+| ID | Method | Tests |
+|----|--------|-------|
+| `stmt-remove-modify` | `Modify` | Record modifications are needed |
+| `stmt-remove-insert` | `Insert` | Record insertions are needed |
+| `stmt-remove-delete` | `Delete` | Record deletions are needed |
+| `stmt-remove-validate` | `Validate` | Field validations are needed |
+| `stmt-remove-error` | `Error` | Error handling is needed |
 
 ### BC-Specific Operators
 
-These test Business Central-specific patterns.
+Target: `call_expression` nodes with specific argument values.
 
-| ID | Pattern | Replacement | Tests |
-|----|---------|-------------|-------|
-| `bc-modify-trigger-true` | `.Modify(true)` | `.Modify(false)` | Trigger execution on modify |
-| `bc-modify-trigger-false` | `.Modify(false)` | `.Modify(true)` | Trigger suppression on modify |
-| `bc-insert-trigger-true` | `.Insert(true)` | `.Insert(false)` | Trigger execution on insert |
-| `bc-delete-trigger-true` | `.Delete(true)` | `.Delete(false)` | Trigger execution on delete |
+| ID | Call | Replacement | Tests |
+|----|------|-------------|-------|
+| `bc-modify-trigger-true` | `Modify(true)` | `Modify(false)` | Trigger execution |
+| `bc-modify-trigger-false` | `Modify(false)` | `Modify(true)` | Trigger suppression |
+| `bc-insert-trigger-true` | `Insert(true)` | `Insert(false)` | Trigger execution |
+| `bc-delete-trigger-true` | `Delete(true)` | `Delete(false)` | Trigger execution |
 
-## Context Filtering
+## Why AST-Based?
 
-The engine automatically skips mutations inside:
-- **Single-line comments**: `// ... `
-- **Block comments**: `/* ... */`
-- **String literals**: `'...'`
+Previous text-based pattern matching (e.g., searching for ` > ` in raw text) generates
+excessive noise — matching object properties, permission sets, attributes, and other
+non-executable constructs. In a real project, this produced 1193 candidates where only
+193 were actual executable code.
 
-You don't need to worry about these in operator definitions.
+Tree-sitter parses the full AST, so operators only match nodes that exist inside
+procedure and trigger bodies. Comments, strings, and metadata are distinct node types
+that operators never target.
 
 ## Writing Custom Operators
 
@@ -103,21 +81,32 @@ Create a JSON file following the operator schema:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/StefanMaron/BusinessCentral.AL.Mutations/master/operators/schema.json",
+  "$schema": "./schema.json",
   "operators": [
     {
-      "id": "my-custom-operator",
-      "name": "Human readable description",
+      "id": "my-custom-op",
+      "name": "Description of what this tests",
       "category": "relational",
-      "pattern": " > ",
-      "replacement": " >= "
+      "node_type": "comparison_expression",
+      "operator_token": ">",
+      "replacement": ">="
     },
     {
       "id": "remove-my-procedure",
       "name": "Remove MyProcedure call",
       "category": "statement-removal",
-      "pattern": "MyProcedure(",
+      "node_type": "call_expression",
+      "identifier": "MyProcedure",
       "replacement": null
+    },
+    {
+      "id": "my-bc-specific",
+      "name": "MyProc(true) to MyProc(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "MyProc",
+      "argument_match": "true",
+      "replacement": "false"
     }
   ]
 }
@@ -127,25 +116,18 @@ Create a JSON file following the operator schema:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `id` | Yes | Unique kebab-case identifier (e.g., `rel-gt-to-gte`) |
+| `id` | Yes | Unique kebab-case identifier |
 | `name` | Yes | Human-readable description |
 | `category` | Yes | One of: `relational`, `arithmetic`, `logical`, `boolean`, `statement-removal`, `boundary`, `control-flow`, `bc-specific` |
-| `pattern` | Yes | Literal string to find in AL source lines |
-| `replacement` | No | String to substitute. `null` means comment out the entire line. |
-
-### Tips for Writing Operators
-
-1. **Include spaces in patterns**: Use ` > ` (with spaces) instead of `>` to avoid false matches in strings like `->` or `>=`
-2. **Use null for statement removal**: Setting `replacement: null` comments out the whole line, which is safer than trying to remove just part of it
-3. **Be specific**: More specific patterns reduce false positives
-4. **Test with dry run**: Use `-DryRun` to see what your operators match before running
+| `node_type` | Yes | Tree-sitter node type to target |
+| `operator_token` | No | Operator text to match within the node (for expression operators) |
+| `identifier` | No | Method name to match (for `call_expression` nodes) |
+| `argument_match` | No | Argument value to match (for BC-specific argument swaps) |
+| `replacement` | No | Text to substitute. `null` comments out the entire line. |
 
 ### Using Custom Operators
 
-```powershell
-# Use a custom operator file
-Invoke-BCMutationTest -ProjectPath ./MyBCExtension -OperatorFile ./my-operators.json
-
-# View operators from a custom file
-Get-BCMutationOperators -OperatorFile ./my-operators.json
+```bash
+al-mutate scan ./src --operators ./my-operators.json
+al-mutate run ./src --tests ./test/MyApp.test.app --operators ./my-operators.json
 ```

@@ -2,170 +2,107 @@
 
 ## Overview
 
-BCMutations is a PowerShell module that performs mutation testing on Business Central AL code.
-It modifies AL source files, compiles and tests them in a BC container, and reports which
-mutations were detected by the test suite.
+al-mutate is a Python CLI tool that performs mutation testing on Business Central AL code.
+It parses AL source files using tree-sitter, identifies mutation targets in the AST,
+applies mutations one at a time, and runs the test suite to check if each mutation is caught.
 
 ## Design Principles
 
-1. **Simple Operators** - Mutations defined as JSON token pairs, engine handles context
-2. **Single Container** - One expensive container setup, fast inner loop
-3. **Minimal Dependencies** - Only BcContainerHelper (checked at runtime)
-4. **PowerShell Conventions** - Approved verbs, module manifest, Public/Private split
+1. **AST-based targeting** — Mutations are identified by querying tree-sitter node types, not text patterns. This eliminates false positives from object properties, attributes, and comments.
+2. **Git-based restore** — Mutated files are always restored via `git checkout`, never by rewriting. This guarantees clean state.
+3. **Fail fast** — Any restore failure or unexpected error aborts immediately. Never leave mutated code in place.
+4. **Append-only log** — Results accumulate across runs in `mutations.json`. Previously-survived mutations can be replayed.
 
 ## Project Structure
 
 ```
-BCMutations/                          # PowerShell module
-  BCMutations.psd1                    # Module manifest
-  BCMutations.psm1                    # Module loader
-  Public/                             # Exported functions
-    Invoke-BCMutationTest.ps1         # Main entry point
-    New-BCMutationConfig.ps1          # Generate default config
-    Get-BCMutationOperators.ps1       # List available operators
-  Private/                            # Internal functions
-    Find-MutationTargets.ps1          # Scan .al files for mutation sites
-    New-Mutation.ps1                  # Apply a mutation to a file
-    Restore-Mutation.ps1              # Restore original file
-    Invoke-ContainerSetup.ps1         # Create BC container
-    Invoke-ContainerTeardown.ps1      # Remove BC container
-    Invoke-AppCompile.ps1             # Compile AL app
-    Invoke-AppDeploy.ps1              # Publish + install app
-    Invoke-TestRun.ps1                # Run tests, return pass/fail
-    ConvertTo-MutationReport.ps1      # Generate report
-    Test-LineContext.ps1              # Check if match is in comment/string
-    Read-OperatorFile.ps1             # Load and validate operator JSON
-    Write-MutationProgress.ps1        # Console progress output
+al_mutate/                    # Python package
+  __init__.py
+  cli.py                      # Entry point: al-mutate command
+  scan.py                     # Parse AL with tree-sitter, find mutation targets
+  mutate.py                   # Apply mutations to files, restore via git
+  run.py                      # Compile, publish, run tests via Linux stack
+  operators.py                # Load and validate operator JSON
+  report.py                   # Generate Markdown reports
+  log.py                      # Mutation log (mutations.json) read/write
 operators/
-  default.json                        # Default AL mutation operators
-  schema.json                         # JSON Schema for operator files
-action.yml                            # GitHub Action definition
-entrypoint.ps1                        # GitHub Action entrypoint
+  default.json                # Default AL mutation operators (AST node-type based)
+  schema.json                 # JSON Schema for operator files
 tests/
-  Unit/                               # Pester unit tests
-  Integration/                        # Pester integration tests (mocked container)
-  Fixtures/                           # Test data (sample AL files, operator files)
+  test_scan.py
+  test_mutate.py
+  test_operators.py
+  test_log.py
+  test_run.py
+  test_report.py
+  test_cli.py
+  fixtures/
+    sample.al                 # Sample AL code for unit tests
+    NoMatches.al              # AL code with no mutable constructs
+pyproject.toml                # Package definition + CLI entry point
 ```
+
+## AST-Based Scanning
+
+The scanner uses [tree-sitter-al](https://github.com/SShadowS/tree-sitter-al) to parse
+each `.al` file into a full AST. Operators specify which node types to target:
+
+- `comparison_expression` — relational operators (`>`, `<`, `>=`, `<=`, `=`, `<>`)
+- `additive_expression` — `+`, `-`
+- `multiplicative_expression` — `*`, `/`
+- `logical_expression` — `and`, `or`
+- `call_expression` — method calls (for statement removal and BC-specific mutations)
+
+Because the AST distinguishes executable code from metadata, comments, and strings,
+no separate context filtering is needed.
 
 ## Execution Flow
 
 ```
-PHASE 1: INITIALIZATION
-  - Validate ProjectPath contains app.json
+STARTUP
+  - Verify clean git working tree (abort if dirty)
   - Load and validate operator definitions
-  - Check BcContainerHelper is available
 
-PHASE 2: MUTATION DISCOVERY
-  - Scan .al files in SourceFolder
-  - For each file + line + operator: check context (skip comments/strings)
-  - Record mutation candidates: { File, Line, Operator, Column }
-  - If -DryRun: output list and return
+BASELINE
+  - Compile + publish + run tests on unmodified code
+  - Abort if baseline fails
 
-PHASE 3: CONTAINER SETUP
-  - Create BC container with test toolkit (New-BcContainer)
-  - Volume mount user's project folder
+REPLAY (if mutations.json exists)
+  - For each SURVIVED mutation from last run:
+    - If original line no longer exists → OBSOLETE
+    - Apply → compile → publish → test → restore
+    - Record: KILLED or SURVIVED
 
-PHASE 4: BASELINE
-  - Compile original app (Compile-AppInBcContainer)
-  - Deploy to container (Publish-BcContainerApp)
-  - Run tests (Run-TestsInBcContainer)
-  - Abort if baseline tests fail
+NEW MUTATIONS
+  - Parse .al files with tree-sitter
+  - Walk AST, match operators to node types
+  - For each candidate: apply → compile → publish → test → restore
+  - Record result
 
-PHASE 5: MUTATION LOOP
-  For each mutation candidate:
-    1. Apply mutation to .al file
-    2. Compile (if fail -> CompileError, skip)
-    3. Deploy to container
-    4. Run tests
-       - Tests fail -> Killed (good)
-       - Tests pass -> Survived (test gap)
-    5. Restore original file
-
-PHASE 6: TEARDOWN
-  - Remove BC container
-
-PHASE 7: REPORT
-  - Calculate score: killed / (killed + survived)
-  - Generate report (JSON/Markdown)
-  - Output summary to console
+REPORT
+  - Append run to mutations.json
+  - Generate report.md
+  - Print summary: score, survivors, required fixes
 ```
 
-## Mutation Operator Schema
+## Linux Stack Integration
 
-Operators are simple token pairs defined in JSON:
+The tool calls external commands for compile/publish/test:
 
-```json
-{
-  "operators": [
-    {
-      "id": "rel-gt-to-gte",
-      "name": "Greater-than to greater-or-equal",
-      "category": "relational",
-      "pattern": " > ",
-      "replacement": " >= "
-    }
-  ]
-}
-```
+| Step | Command |
+|------|---------|
+| Compile | `al-compile` |
+| Publish | `bc-publish` |
+| Run tests | `/opt/bc-linux/scripts/run-tests.sh` |
+| Restore | `git checkout -- <file>` |
 
-- `pattern`: Literal string to find in AL source lines
-- `replacement`: String to substitute. `null` means comment out the entire line
-- `id`: Unique kebab-case identifier for filtering and reporting
-- `category`: Grouping for filtering and report organization
+These are expected to be available on PATH in the dev container environment.
 
-The engine handles context filtering (comments, strings), not the operator file.
+## Mutation Log
 
-## Context Detection (Test-LineContext)
+Results are persisted to `mutations.json` (append-only):
 
-Simple state machine that determines if a character position is inside:
-- Single-line comment (`//` to end of line)
-- Block comment (`/* ... */`)
-- String literal (`'...'` in AL)
-
-This covers 99% of real AL code without needing a full parser.
-
-## Container Lifecycle
-
-Container creation is the most expensive operation (~5-10 min). The tool creates one container
-and reuses it for all mutations:
-
-- `New-BcContainer` with `-includeTestToolkit -includeTestLibrariesOnly`
-- Volume mount the project folder for source access
-- Each mutant: compile -> deploy (via `-useDevEndpoint`) -> test -> restore
-- `Remove-BcContainer` at the end (in `finally` block)
-
-## Version Bumping
-
-BC won't install an app with the same version. For each mutant, the tool increments the build
-number in `app.json` (e.g., `1.0.0.0` -> `1.0.0.1` -> `1.0.0.2`) and restores it after.
-
-## Report Format
-
-The tool generates reports in JSON (default) and Markdown:
-
-- **Mutation score**: killed / (killed + survived). CompileErrors are excluded.
-- **Survived mutants**: Listed with file, line, original code, mutated code
-- **Killed mutants**: Summary count (details in expandable section)
-
-## Key Parameters
-
-| Parameter | Description | Default |
-|---|---|---|
-| `-ProjectPath` | User's AL project root | (required) |
-| `-SourceFolder` | Subfolder with .al source files | `src` |
-| `-OperatorFile` | Custom operator JSON | bundled `default.json` |
-| `-ContainerName` | BC container name | `bcmutations` |
-| `-TestSuite` | Test suite to run | `DEFAULT` |
-| `-ReportFormat` | `json` or `markdown` | `json` |
-| `-DryRun` | List mutations without executing | `false` |
-| `-SkipContainerCreate` | Use existing container | `false` |
-| `-SkipContainerRemove` | Leave container after run | `false` |
-| `-MaxMutants` | Limit mutant count (0=unlimited) | `0` |
-
-## Testing Strategy
-
-- **Unit tests** (Pester): Test each private function in isolation. No BC container needed.
-  Run on any OS (ubuntu-latest in CI).
-- **Integration tests** (Pester): Test `Invoke-BCMutationTest` with mocked BcContainerHelper.
-  Verify the orchestration logic without a real container.
-- **End-to-end**: Requires Windows + Docker. Manual or on self-hosted runner.
+- **KILLED** — tests caught the mutation
+- **SURVIVED** — tests still passed (test gap)
+- **COMPILE_ERROR** — mutation broke compilation (excluded from score)
+- **OBSOLETE** — original code no longer exists at that location

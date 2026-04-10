@@ -1,9 +1,0 @@
-{
-  "operators": [
-    {
-      "id": "rel-gt-to-gte",
-      "category": "relational",
-      "pattern": " > "
-    }
-  ]
-}

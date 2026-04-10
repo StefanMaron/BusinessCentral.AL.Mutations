@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "BCMutations Operator File",
-  "description": "Schema for BCMutations mutation operator definition files",
+  "title": "AL Mutation Operator File",
+  "description": "Schema for AL mutation operator definitions (tree-sitter AST based)",
   "type": "object",
   "required": ["operators"],
   "additionalProperties": false,
@@ -20,7 +20,7 @@
   "definitions": {
     "operator": {
       "type": "object",
-      "required": ["id", "name", "category", "pattern"],
+      "required": ["id", "name", "category", "node_type"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -47,14 +47,26 @@
           ],
           "description": "Category for grouping and filtering operators"
         },
-        "pattern": {
+        "node_type": {
           "type": "string",
           "minLength": 1,
-          "description": "Literal string to find in AL source lines"
+          "description": "Tree-sitter node type to match (e.g. comparison_expression, call_expression)"
+        },
+        "operator_token": {
+          "type": "string",
+          "description": "The operator token text to match within the node (e.g. '>', '+')"
+        },
+        "identifier": {
+          "type": "string",
+          "description": "Method/function name to match for call_expression nodes"
+        },
+        "argument_match": {
+          "type": "string",
+          "description": "Argument text to match (e.g. 'true' for .Modify(true))"
         },
         "replacement": {
           "type": ["string", "null"],
-          "description": "String to substitute. null means comment out the entire line."
+          "description": "Token to substitute. null means comment out the entire statement line."
         }
       }
     }
