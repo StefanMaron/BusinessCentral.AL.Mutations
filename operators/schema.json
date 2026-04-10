@@ -64,6 +64,10 @@
           "type": "string",
           "description": "Argument text to match (e.g. 'true' for .Modify(true))"
         },
+        "identifier_replacement": {
+          "type": "string",
+          "description": "Replacement method name for call_expression identifier swaps (e.g. FindSet -> FindFirst)"
+        },
         "replacement": {
           "type": ["string", "null"],
           "description": "Token to substitute. null means comment out the entire statement line."

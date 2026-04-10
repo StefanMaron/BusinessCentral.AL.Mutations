@@ -115,10 +115,100 @@ class TestScanFile:
 
     def test_no_mutations_in_properties(self, operators):
         """Should not mutate object properties, permission sets, or attributes."""
-        # Create a file with only non-executable AL constructs
         no_exec = FIXTURES / "NoMatches.al"
         candidates = scan_file(no_exec, operators)
         assert len(candidates) == 0
+
+    # --- New Tier 1-3 operators ---
+
+    def test_finds_bool_true_to_false(self, operators):
+        """Should find boolean true literals in assignments."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        bools = [c for c in candidates if c.operator_id == "bool-true-to-false"]
+        assert len(bools) > 0
+        for b in bools:
+            assert "false" in b.mutated
+
+    def test_finds_bool_false_to_true(self, operators):
+        """Should find boolean false literals in assignments."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        bools = [c for c in candidates if c.operator_id == "bool-false-to-true"]
+        assert len(bools) > 0
+        for b in bools:
+            assert "true" in b.mutated
+
+    def test_finds_unary_remove_not(self, operators):
+        """Should find 'not' in 'if not Rec.IsEmpty()' on line 47."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        nots = [c for c in candidates if c.operator_id == "unary-remove-not"]
+        assert len(nots) == 1
+        assert "not " not in nots[0].mutated
+
+    def test_finds_exit_true_to_false(self, operators):
+        """Should find exit(true) on line 50."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        exits = [c for c in candidates if c.operator_id == "exit-true-to-false"]
+        assert len(exits) == 1
+        assert "exit(false)" in exits[0].mutated
+
+    def test_finds_exit_false_to_true(self, operators):
+        """Should find exit(false) on line 68."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        exits = [c for c in candidates if c.operator_id == "exit-false-to-true"]
+        assert len(exits) == 1
+        assert "exit(true)" in exits[0].mutated
+
+    def test_finds_stmt_remove_testfield(self, operators):
+        """Should find TestField call on line 53."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        tfs = [c for c in candidates if c.operator_id == "stmt-remove-testfield"]
+        assert len(tfs) == 1
+        assert tfs[0].mutated.strip().startswith("//")
+
+    def test_finds_stmt_remove_setrange(self, operators):
+        """Should find SetRange call on line 54."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        srs = [c for c in candidates if c.operator_id == "stmt-remove-setrange"]
+        assert len(srs) == 1
+
+    def test_finds_stmt_remove_setfilter(self, operators):
+        """Should find SetFilter call on line 55."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        sfs = [c for c in candidates if c.operator_id == "stmt-remove-setfilter"]
+        assert len(sfs) == 1
+
+    def test_finds_stmt_remove_commit(self, operators):
+        """Should find Commit() call on line 59."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        commits = [c for c in candidates if c.operator_id == "stmt-remove-commit"]
+        assert len(commits) == 1
+
+    def test_finds_stmt_remove_init(self, operators):
+        """Should find Init() call on line 58."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        inits = [c for c in candidates if c.operator_id == "stmt-remove-init"]
+        assert len(inits) == 1
+
+    def test_finds_stmt_remove_deleteall(self, operators):
+        """Should find DeleteAll call on line 60."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        das = [c for c in candidates if c.operator_id == "stmt-remove-deleteall"]
+        assert len(das) == 1
+
+    def test_finds_bc_deleteall_trigger(self, operators):
+        """Should find DeleteAll(true) for bc-specific mutation."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        das = [c for c in candidates if c.operator_id == "bc-deleteall-trigger-true"]
+        assert len(das) == 1
+        assert "false" in das[0].mutated
+
+    def test_finds_bc_findset_to_findfirst(self, operators):
+        """Should find FindSet() and replace with FindFirst()."""
+        candidates = scan_file(FIXTURES / "sample.al", operators)
+        fss = [c for c in candidates if c.operator_id == "bc-findset-to-findfirst"]
+        assert len(fss) == 1
+        assert "FindFirst" in fss[0].mutated
+        assert "FindSet" not in fss[0].mutated
 
 
 class TestScanDirectory:

@@ -26,6 +26,18 @@ def _make_parser() -> Parser:
     return Parser(AL_LANGUAGE)
 
 
+def _is_inside_code_block(node) -> bool:
+    """Check if a node is inside a procedure/trigger code_block (not in attributes/properties)."""
+    p = node.parent
+    while p:
+        if p.type == "code_block":
+            return True
+        if p.type in ("attribute_argument_list", "attribute_arguments"):
+            return False
+        p = p.parent
+    return False
+
+
 def _get_call_identifier(node) -> str | None:
     """Extract the method name from a call_expression node.
 
@@ -35,10 +47,21 @@ def _get_call_identifier(node) -> str | None:
         if child.type == "identifier":
             return child.text.decode()
         if child.type == "member_expression":
-            # Last identifier in member_expression is the method name
             for mc in reversed(child.children):
                 if mc.type == "identifier":
                     return mc.text.decode()
+    return None
+
+
+def _get_call_identifier_node(node):
+    """Get the identifier node for the method name in a call_expression."""
+    for child in node.children:
+        if child.type == "identifier":
+            return child
+        if child.type == "member_expression":
+            for mc in reversed(child.children):
+                if mc.type == "identifier":
+                    return mc
     return None
 
 
@@ -83,17 +106,66 @@ def _build_mutated_line(source_lines: list[bytes], node, op: Operator) -> str | 
     line_idx = node.start_point[0]
     original_line = source_lines[line_idx].decode()
 
+    # --- boolean literal ---
+    if op.node_type == "boolean":
+        if not _is_inside_code_block(node):
+            return None
+        node_text = node.text.decode()
+        if node_text != op.operator_token:
+            return None
+        col_start = node.start_point[1]
+        col_end = node.end_point[1]
+        return original_line[:col_start] + op.replacement + original_line[col_end:]
+
+    # --- unary_expression (remove not) ---
+    if op.node_type == "unary_expression":
+        not_child = None
+        operand_child = None
+        for child in node.children:
+            if child.type == "not":
+                not_child = child
+            elif child.type not in ("(", ")"):
+                operand_child = child
+        if not_child is None or operand_child is None:
+            return None
+        # Remove "not " from the line
+        not_start = not_child.start_point[1]
+        operand_start = operand_child.start_point[1]
+        return original_line[:not_start] + original_line[operand_start:]
+
+    # --- exit_statement (swap boolean argument) ---
+    if op.node_type == "exit_statement":
+        for child in node.children:
+            if child.type == "boolean" and child.text.decode() == op.operator_token:
+                col_start = child.start_point[1]
+                col_end = child.end_point[1]
+                return original_line[:col_start] + op.replacement + original_line[col_end:]
+        return None
+
+    # --- call_expression ---
     if op.node_type == "call_expression":
         ident = _get_call_identifier(node)
         if ident != op.identifier:
             return None
 
+        # Method name replacement (e.g., FindSet -> FindFirst)
+        if op.identifier_replacement is not None:
+            ident_node = _get_call_identifier_node(node)
+            if ident_node is None:
+                return None
+            col_start = ident_node.start_point[1]
+            col_end = ident_node.end_point[1]
+            return (
+                original_line[:col_start]
+                + op.identifier_replacement
+                + original_line[col_end:]
+            )
+
+        # Argument value replacement (e.g., Modify(true) -> Modify(false))
         if op.argument_match is not None:
-            # BC-specific: match a specific argument value and replace it
             args = _get_argument_text(node)
             if op.argument_match not in args:
                 return None
-            # Find the argument node and replace its text
             for child in node.children:
                 if child.type == "argument_list":
                     for arg_node in child.children:
@@ -107,12 +179,13 @@ def _build_mutated_line(source_lines: list[bytes], node, op: Operator) -> str | 
                             )
             return None
 
+        # Statement removal (comment out the line)
         if op.is_statement_removal:
             return "// " + original_line.lstrip()
 
         return None
 
-    # Expression operators: replace the operator token
+    # --- Expression operators: replace the operator token ---
     op_child = _get_operator_child(node, op)
     if op_child is None:
         return None

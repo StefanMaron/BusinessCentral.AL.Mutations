@@ -172,6 +172,111 @@
       "identifier": "Delete",
       "argument_match": "true",
       "replacement": "false"
+    },
+    {
+      "id": "bool-true-to-false",
+      "name": "True literal to false",
+      "category": "boolean",
+      "node_type": "boolean",
+      "operator_token": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bool-false-to-true",
+      "name": "False literal to true",
+      "category": "boolean",
+      "node_type": "boolean",
+      "operator_token": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "unary-remove-not",
+      "name": "Remove not negation",
+      "category": "logical",
+      "node_type": "unary_expression",
+      "operator_token": "not",
+      "replacement": null
+    },
+    {
+      "id": "exit-true-to-false",
+      "name": "exit(true) to exit(false)",
+      "category": "control-flow",
+      "node_type": "exit_statement",
+      "operator_token": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "exit-false-to-true",
+      "name": "exit(false) to exit(true)",
+      "category": "control-flow",
+      "node_type": "exit_statement",
+      "operator_token": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "stmt-remove-testfield",
+      "name": "Remove TestField call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "TestField",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-setrange",
+      "name": "Remove SetRange call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "SetRange",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-setfilter",
+      "name": "Remove SetFilter call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "SetFilter",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-commit",
+      "name": "Remove Commit call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Commit",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-init",
+      "name": "Remove Init call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Init",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-deleteall",
+      "name": "Remove DeleteAll call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "DeleteAll",
+      "replacement": null
+    },
+    {
+      "id": "bc-deleteall-trigger-true",
+      "name": "DeleteAll(true) to DeleteAll(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "DeleteAll",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-findset-to-findfirst",
+      "name": "FindSet to FindFirst",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "FindSet",
+      "identifier_replacement": "FindFirst"
     }
   ]
 }

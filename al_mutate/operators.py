@@ -20,6 +20,7 @@ class Operator:
     operator_token: str | None = None
     identifier: str | None = None
     argument_match: str | None = None
+    identifier_replacement: str | None = None
     replacement: str | None = None
 
     @property
@@ -45,6 +46,7 @@ def load_operators(path: Path) -> list[Operator]:
             operator_token=op.get("operator_token"),
             identifier=op.get("identifier"),
             argument_match=op.get("argument_match"),
+            identifier_replacement=op.get("identifier_replacement"),
             replacement=op.get("replacement"),
         )
         for op in data["operators"]

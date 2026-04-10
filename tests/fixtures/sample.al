@@ -34,4 +34,37 @@ codeunit 50100 "Credit Management"
         IsValid := true;
         Rec.Insert(false);
     end;
+
+    procedure ProcessRecords()
+    var
+        Rec: Record Customer;
+        Found: Boolean;
+    begin
+        // boolean literals
+        Found := false;
+
+        // unary not
+        if not Rec.IsEmpty() then begin
+            // exit with boolean
+            if Found then
+                exit(true);
+
+            // TestField, SetRange, SetFilter
+            Rec.TestField("No.");
+            Rec.SetRange("Customer Group", 'A');
+            Rec.SetFilter(Name, '%1', '*test*');
+
+            // Init, Commit, DeleteAll
+            Rec.Init();
+            Commit();
+            Rec.DeleteAll(true);
+
+            // FindSet
+            if Rec.FindSet() then
+                repeat
+                until Rec.Next() = 0;
+        end;
+
+        exit(false);
+    end;
 }
