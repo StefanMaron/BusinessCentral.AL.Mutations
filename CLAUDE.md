@@ -1,60 +1,74 @@
 # BusinessCentral.AL.Mutations — Development Guide
 
-## Project Pivot: Linux Stack
+## What This Is
 
-This project was originally built targeting Windows + BcContainerHelper + PowerShell.
-That approach is obsolete. The new stack is:
+A C# .NET global tool (`al-mutate`, NuGet: `MSDyn365BC.AL.Mutate`) for mutation testing
+Microsoft Dynamics 365 Business Central AL code.
 
-- **Python CLI** instead of PowerShell module
-- **`/opt/bc-linux/scripts/run-tests.sh`** instead of BcContainerHelper for test execution
-- **`al-compile` + `bc-publish`** for compile and deploy
-- **`git checkout -- <file>`** for mutation restore (requires clean working tree — enforced at startup)
-- **Linux-first** — runs inside the same dev container as the AL project
+The core concept: apply mutations, run tests, report survivors.
 
-The core concept is identical: apply mutations, run tests, report survivors. Only the runtime changed.
+## Stack
 
-## What This Tool Does
+- **C# .NET 8** — `dotnet tool install --global MSDyn365BC.AL.Mutate`
+- **`Microsoft.Dynamics.Nav.CodeAnalysis`** — AST-based mutation scanning (`NavSyntaxTree` / `NavSyntaxWalker`)
+- **AL Runner** (`../BusinessCentral.AL.Runner`) — project reference for in-process test execution
+- **`git checkout -- <file>`** — mutation restore (requires clean working tree — enforced at startup)
 
-1. Scans `.al` source files for mutable locations using operator definitions
-2. Verifies the working tree is clean (git) — aborts if not
-3. Runs the baseline test suite — aborts if tests don't pass clean
-4. For each mutation: modify source → compile → publish → run tests → restore via git
-5. Persists results to `mutations.json` (append-only across runs)
-6. On subsequent runs: replays previously-survived mutations first, then generates new ones
-7. Reports mutation score, survivors, and required test fixes
+> The old Python implementation in `al_mutate/` is gone. The old PowerShell module (`BCMutations/`) is also gone.
 
-## AST-Based Mutation Targeting
+## Solution Structure
 
-Mutation targets are identified using **tree-sitter-al** — a tree-sitter grammar for AL with Python bindings.
+```
+AlMutate/
+  AlMutate.slnx                 # Solution file
+  AlMutate/                     # Main tool project
+    operators/
+      default.json              # Embedded resource — default mutation operators
+  AlMutate.Tests/               # xUnit test project
+  tests/                        # Integration test fixtures (AL files, etc.)
+operators/                      # Repo-level operator reference (mirrors embedded resource)
+docs/
+  ARCHITECTURE.md
+  OPERATORS.md
+  USAGE.md
+  CSHARP_MIGRATION_PLAN.md      # Archived: migration complete April 2026
+```
+
+## Development Principles
+
+**Strict TDD:** Write a failing test first, then implement. Every function must have a test.
+
+**No BC dependency in unit tests:** Unit tests use `FakeTestRunner`. Only integration tests use
+the real `AlRunnerPipeline`.
+
+**Fail fast:** Any restore failure or unexpected error aborts immediately. Never leave mutated code in place.
+
+## Running Tests
 
 ```bash
-pip install tree-sitter-al    # PyPI package
+# Unit tests only (no BC instance needed)
+dotnet test AlMutate/AlMutate.slnx --filter "Category!=Integration"
+
+# All tests (requires a running BC instance)
+dotnet test AlMutate/AlMutate.slnx
 ```
 
-```python
-import tree_sitter_al
-from tree_sitter import Language, Parser
+## Key Classes
 
-AL_LANGUAGE = Language(tree_sitter_al.language())
-parser = Parser(AL_LANGUAGE)
-tree = parser.parse(source_bytes)
-```
+| Class | Responsibility |
+|-------|---------------|
+| `MutationPipeline` | Orchestrates the full run: startup → baseline → replay → new mutations → report |
+| `AlScanner` | Walks NavSyntaxTree, matches operators to node types, returns candidates |
+| `Mutator` | Applies and restores mutations (restore always via `git checkout`) |
+| `GitService` | Checks working tree cleanliness, performs restore |
+| `AlRunnerTestRunner` | Integrates with AL Runner (`AlRunnerPipeline.Run()`) |
+| `MutationLog` | Reads/writes `mutations.json` (append-only) |
+| `ReportGenerator` | Generates `report.md` and prints summary |
+| `OperatorLoader` | Loads and validates operator JSON (embedded resource or custom file) |
 
-This gives a full AST. Operators query specific node types — no text pattern matching, no noise from object properties or attributes. The node's position in the tree inherently tells you it's inside a procedure body.
+## Operator Format
 
-**Key node types for mutation:**
-
-| Node Type | Targets |
-|-----------|---------|
-| `comparison_expression` | `>`, `<`, `>=`, `<=`, `=`, `<>` |
-| `additive_expression` | `+`, `-` |
-| `multiplicative_expression` | `*`, `/`, `mod`, `div` |
-| `logical_expression` | `and`, `or` |
-| `unary_expression` | `not` |
-| `call_expression` | method calls (for statement removal) |
-| `asserterror_statement` | asserterror (for removal) |
-
-**Operator format** — node-type based instead of text patterns:
+Operators are in `AlMutate/AlMutate/operators/default.json` (embedded resource):
 
 ```json
 {
@@ -81,137 +95,19 @@ This gives a full AST. Operators query specific node types — no text pattern m
 
 `replacement: null` → comment out the entire statement line.
 
-The grammar is at https://github.com/SShadowS/tree-sitter-al — actively maintained, 100% parse success on 15,358 production AL files, 1,404 tests.
+33 operators across 8 categories: relational, arithmetic, logical, boolean,
+statement-removal, boundary, control-flow, bc-specific.
 
-## Project Structure (Target)
+## mutations.json Schema
 
-```
-al_mutate/                    # Python package
-  __init__.py
-  cli.py                      # Entry point: `al-mutate` command
-  scan.py                     # Find mutation targets via tree-sitter AST queries
-  mutate.py                   # Apply and restore mutations
-  run.py                      # Compile, publish, run tests via Linux stack
-  operators.py                # Load and validate operator JSON
-  report.py                   # Generate JSON + Markdown reports
-  log.py                      # Mutation log (mutations.json) read/write
-operators/
-  default.json                # Default AL mutation operators (node-type based)
-  schema.json                 # JSON Schema for operator files
-tests/
-  test_scan.py
-  test_mutate.py
-  test_operators.py
-  fixtures/
-    sample.al                 # Sample AL snippets for unit tests
-pyproject.toml                # Package definition + CLI entry point
-README.md
-docs/
-  ARCHITECTURE.md
-  OPERATORS.md
-  USAGE.md
-```
+Schema version 1 (unchanged from Python era). Statuses: `KILLED` | `SURVIVED` | `COMPILE_ERROR` | `OBSOLETE`.
 
-## CLI Interface
+`OBSOLETE` = original line no longer exists in the file (production code changed).
 
-```bash
-# Run full mutation test
-al-mutate run ./src --tests ./test/MyApp.test.app
+## --stubs Flag
 
-# Scan only (list mutations without executing)
-al-mutate scan ./src
-
-# Replay previously-survived mutations from an existing log
-al-mutate replay mutations.json --tests ./test/MyApp.test.app
-
-# Use custom operators
-al-mutate run ./src --tests ./test/MyApp.test.app --operators ./my-operators.json
-
-# Limit mutations (useful for quick checks)
-al-mutate run ./src --tests ./test/MyApp.test.app --max 20
-```
-
-## Linux Stack Integration
-
-### Compile
-```bash
-~/.claude/tools/al-smart-compile/al-compile
-```
-
-### Publish
-```bash
-bc-publish    # auto-detects $BC_SERVER
-```
-
-Or via curl:
-```bash
-BC_HOST="${BC_SERVER:-localhost}"
-curl -u BCRUNNER:Admin123! -X POST \
-  -F "file=@path/to/app.app;type=application/octet-stream" \
-  "http://${BC_HOST}:7049/BC/dev/apps?SchemaUpdateMode=forcesync"
-```
-
-### Run Tests
-```bash
-BC_HOST="${BC_SERVER:-localhost}"
-/opt/bc-linux/scripts/run-tests.sh \
-  --base-url "http://${BC_HOST}:7048/BC" \
-  --dev-url "http://${BC_HOST}:7049/BC/dev" \
-  --app path/to/test-app.app
-```
-
-Exit code: 0 = all pass, 1 = failures exist.
-
-### Mutation Restore
-```bash
-git checkout -- <file>
-```
-
-Always restore via git, never by re-writing the file. If restore fails, abort immediately.
-
-## Mutation Log Format
-
-Mutations are persisted to `mutations.json` (append-only — never delete history):
-
-```json
-{
-  "schema_version": 1,
-  "project": "./src",
-  "runs": [
-    {
-      "run": 1,
-      "date": "2026-04-10T09:00:00",
-      "mutations": [
-        {
-          "id": "M001",
-          "operator": "rel-gt-to-gte",
-          "file": "src/CreditManagement.al",
-          "line": 42,
-          "original": "if Amount > 0 then",
-          "mutated": "if Amount >= 0 then",
-          "status": "KILLED",
-          "caught_by": "ValidateCreditLimit_Negative_ThrowsError"
-        },
-        {
-          "id": "M002",
-          "operator": "stmt-remove-error",
-          "file": "src/CreditManagement.al",
-          "line": 87,
-          "original": "Error('Credit limit exceeded.');",
-          "mutated": "// Error('Credit limit exceeded.');",
-          "status": "SURVIVED",
-          "caught_by": null
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Statuses:** `KILLED` | `SURVIVED` | `COMPILE_ERROR` | `OBSOLETE`
-
-`OBSOLETE` means the `original` string no longer exists in the file — production code changed, mutation needs regenerating for that area.
-
+Use `--stubs <path>` for repos that contain stub AL files (e.g. Sentinel). This excludes stub
+files from mutation scanning so only real implementation code is targeted.
 
 ## Execution Flow
 
@@ -219,23 +115,21 @@ Mutations are persisted to `mutations.json` (append-only — never delete histor
 STARTUP
   - Verify clean git working tree (abort if dirty)
   - Load operator definitions
-  - Check /opt/bc-linux is mounted
 
 BASELINE
-  - Compile + publish + run tests on unmodified code
-  - Abort if baseline fails (tests must be green before mutation)
+  - Compile + run tests on unmodified code via AL Runner
+  - Abort if baseline fails
 
 REPLAY (if mutations.json exists)
   - For each SURVIVED mutation from last run:
     - Find original string in file (if missing → OBSOLETE)
-    - Apply mutation → compile → publish → run tests → restore
-    - Record: KILLED (now fixed) or SURVIVED (still a gap)
+    - Apply mutation → compile → test → restore
+    - Record: KILLED or SURVIVED
 
 NEW MUTATIONS
-  - Scan .al files for operator matches (skip if identical to existing log entry)
-  - For each new candidate:
-    - Apply → compile → publish → run tests → restore
-    - Record result
+  - Walk NavSyntaxTree, match operators to node types
+  - For each candidate: apply → compile → test → restore
+  - Record result
 
 REPORT
   - Append new run to mutations.json
@@ -243,36 +137,10 @@ REPORT
   - Print summary: score, survivors, required fixes
 ```
 
-## Development Principles
+## GitHub Actions
 
-**TDD:** Write a failing test first, then implement. Every function must have a test.
-
-**No container dependency in unit tests:** Unit tests use fixture `.al` files and mock the compile/publish/test runner calls. Only integration tests hit a real BC instance.
-
-**Fail fast:** Any unexpected error during mutation (restore failure, compile crash) stops the run immediately. Never leave mutated code in place.
-
-**Tree-sitter handles context:** Because we operate on the AST, mutations are never generated inside comments or string literals — those are distinct node types that operators simply don't target.
-
-## Bootstrap Order
-
-1. `pyproject.toml` — package definition, CLI entry point (`tree-sitter-al` as dependency)
-2. `al_mutate/operators.py` + `tests/test_operators.py` — load/validate operator JSON
-3. `al_mutate/scan.py` + `tests/test_scan.py` — parse AL with tree-sitter, query node types, return candidates
-4. `al_mutate/mutate.py` + `tests/test_mutate.py` — apply and restore mutations
-5. `al_mutate/log.py` — read/write mutations.json
-6. `al_mutate/run.py` — compile, publish, run tests via Linux stack
-7. `al_mutate/report.py` — generate JSON + Markdown
-8. `al_mutate/cli.py` — wire it all together into `al-mutate` command
-9. `operators/default.json` — full AL operator set (node-type based)
-
-## Current State
-
-The old PowerShell implementation in `BCMutations/` is obsolete. The Python rewrite starts fresh.
-The operator definitions in `operators/default.json` (once created) should cover the same
-categories as before: relational, arithmetic, logical, boolean, statement-removal, BC-specific.
-
-Files to remove or ignore (old PowerShell code):
-- `BCMutations/` directory
-- `entrypoint.ps1`
-- `action.yml` (GitHub Action — not the priority, Linux CLI is)
-- `tests/Unit/`, `tests/Integration/` (Pester tests)
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `test.yml` | push to master | Build + unit tests |
+| `mutation-sentinel.yml` | workflow_dispatch | Run mutations against Sentinel |
+| `publish.yml` | tag push | Publish NuGet package |

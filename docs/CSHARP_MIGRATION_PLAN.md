@@ -1,3 +1,6 @@
+> **Status: COMPLETE** — Migration finished April 2026. This document is archived for historical reference.
+> See [ARCHITECTURE.md](ARCHITECTURE.md) and [USAGE.md](USAGE.md) for current documentation.
+
 # C# Migration Plan: BusinessCentral.AL.Mutations
 
 ## 1. Solution Structure

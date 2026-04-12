@@ -20,12 +20,12 @@ al-mutate run ./src --tests ./test/MyApp.test.app
 
 1. Verifies git working tree is clean
 2. Runs a baseline compile + test (must pass)
-3. For each mutation: modify source → compile → publish → run tests → restore via git
+3. For each mutation: modify source → compile → run tests → restore via git
 4. Reports which mutations survived (your test gaps)
 
-Mutations are identified using [tree-sitter-al](https://github.com/SShadowS/tree-sitter-al),
-a full AST parser for AL. This means mutations only target executable code — never object
-properties, attributes, permission sets, or comments.
+Mutations are identified using `Microsoft.Dynamics.Nav.CodeAnalysis` — the official AL compiler
+SDK — which provides a full syntax tree (NavSyntaxTree). This means mutations only target
+executable code — never object properties, attributes, permission sets, or comments.
 
 ## Mutation Operators
 
@@ -39,15 +39,15 @@ Operators target specific AST node types:
 | Statement removal | comment out `Rec.Modify(...)` | Side effects are needed |
 | BC-specific | `Modify(true)` → `Modify(false)` | Trigger execution |
 
-Custom operators can be defined in JSON. See [Operators Guide](docs/OPERATORS.md).
+33 operators across 8 categories. Custom operators can be defined in JSON. See [Operators Guide](docs/OPERATORS.md).
 
 ## Installation
 
 ```bash
-pip install -e ".[dev]"
+dotnet tool install --global MSDyn365BC.AL.Mutate
 ```
 
-Requires Python 3.10+.
+Requires .NET 8.0 SDK or later.
 
 ## Usage
 
@@ -66,6 +66,9 @@ al-mutate replay mutations.json --tests ./test/MyApp.test.app
 
 # Use custom operators
 al-mutate run ./src --tests ./test/MyApp.test.app --operators ./my-operators.json
+
+# Exclude stub files (for repos like Sentinel)
+al-mutate run ./src --tests ./test/MyApp.test.app --stubs ./stubs
 ```
 
 See [Usage Guide](docs/USAGE.md) for details.
@@ -80,13 +83,32 @@ See [Usage Guide](docs/USAGE.md) for details.
 ## Development
 
 ```bash
-# Create venv and install
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+# Build
+dotnet build AlMutate/AlMutate.slnx
 
-# Run tests
-pytest -v
+# Run unit tests (no BC instance required)
+dotnet test AlMutate/AlMutate.slnx --filter "Category!=Integration"
+
+# Run all tests
+dotnet test AlMutate/AlMutate.slnx
+```
+
+Test execution uses [AL Runner](https://github.com/StefanMaron/BusinessCentral.AL.Runner) for
+in-process test execution — no BC container or Linux stack tools required.
+
+## Project Structure
+
+```
+AlMutate/
+  AlMutate.slnx               # Solution file
+  AlMutate/                   # Main tool project (C#)
+  AlMutate.Tests/             # xUnit test project
+operators/
+  default.json                # Default AL mutation operators
+docs/
+  ARCHITECTURE.md
+  OPERATORS.md
+  USAGE.md
 ```
 
 ## License

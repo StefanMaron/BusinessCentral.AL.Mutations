@@ -2,59 +2,79 @@
 
 ## Overview
 
-al-mutate is a Python CLI tool that performs mutation testing on Business Central AL code.
-It parses AL source files using tree-sitter, identifies mutation targets in the AST,
-applies mutations one at a time, and runs the test suite to check if each mutation is caught.
+al-mutate is a C# .NET global tool that performs mutation testing on Business Central AL code.
+It parses AL source files using `Microsoft.Dynamics.Nav.CodeAnalysis`, identifies mutation
+targets in the syntax tree, applies mutations one at a time, and runs the test suite via
+AL Runner to check if each mutation is caught.
 
 ## Design Principles
 
-1. **AST-based targeting** — Mutations are identified by querying tree-sitter node types, not text patterns. This eliminates false positives from object properties, attributes, and comments.
-2. **Git-based restore** — Mutated files are always restored via `git checkout`, never by rewriting. This guarantees clean state.
-3. **Fail fast** — Any restore failure or unexpected error aborts immediately. Never leave mutated code in place.
-4. **Append-only log** — Results accumulate across runs in `mutations.json`. Previously-survived mutations can be replayed.
+1. **AST-based targeting** — Mutations are identified by walking the `NavSyntaxTree` and matching
+   operator node types. This eliminates false positives from object properties, attributes,
+   comments, and string literals.
+2. **Git-based restore** — Mutated files are always restored via `git checkout -- <file>`, never
+   by rewriting. This guarantees clean state.
+3. **Fail fast** — Any restore failure or unexpected error aborts immediately. Never leave mutated
+   code in place.
+4. **Append-only log** — Results accumulate across runs in `mutations.json`. Previously-survived
+   mutations can be replayed.
 
-## Project Structure
+## Solution Structure
 
 ```
-al_mutate/                    # Python package
-  __init__.py
-  cli.py                      # Entry point: al-mutate command
-  scan.py                     # Parse AL with tree-sitter, find mutation targets
-  mutate.py                   # Apply mutations to files, restore via git
-  run.py                      # Compile, publish, run tests via Linux stack
-  operators.py                # Load and validate operator JSON
-  report.py                   # Generate Markdown reports
-  log.py                      # Mutation log (mutations.json) read/write
-operators/
-  default.json                # Default AL mutation operators (AST node-type based)
-  schema.json                 # JSON Schema for operator files
-tests/
-  test_scan.py
-  test_mutate.py
-  test_operators.py
-  test_log.py
-  test_run.py
-  test_report.py
-  test_cli.py
-  fixtures/
-    sample.al                 # Sample AL code for unit tests
-    NoMatches.al              # AL code with no mutable constructs
-pyproject.toml                # Package definition + CLI entry point
+AlMutate/
+  AlMutate.slnx                 # Solution file
+  AlMutate/                     # Main tool project
+    operators/
+      default.json              # Embedded resource — default mutation operators
+  AlMutate.Tests/               # xUnit test project
+  tests/                        # Integration test fixtures (AL files, etc.)
 ```
+
+## Key Classes
+
+| Class | Responsibility |
+|-------|---------------|
+| `MutationPipeline` | Orchestrates the full run: startup → baseline → replay → new mutations → report |
+| `AlScanner` | Walks NavSyntaxTree via NavSyntaxWalker, matches operators to node types, returns candidates |
+| `Mutator` | Applies mutations to source files and records originals |
+| `GitService` | Checks working tree cleanliness; restores files via `git checkout -- <file>` |
+| `AlRunnerTestRunner` | Wraps AL Runner integration (`AlRunnerPipeline.Run()`) for test execution |
+| `MutationLog` | Reads/writes `mutations.json` (append-only, schema_version 1) |
+| `ReportGenerator` | Generates `report.md` and prints score summary to stdout |
+| `OperatorLoader` | Loads and validates operator JSON from embedded resource or custom file |
 
 ## AST-Based Scanning
 
-The scanner uses [tree-sitter-al](https://github.com/SShadowS/tree-sitter-al) to parse
-each `.al` file into a full AST. Operators specify which node types to target:
+The scanner uses `Microsoft.Dynamics.Nav.CodeAnalysis` to parse each `.al` file into a full
+NavSyntaxTree. A custom `NavSyntaxWalker` subclass visits nodes and matches them against the
+loaded operator definitions:
 
 - `comparison_expression` — relational operators (`>`, `<`, `>=`, `<=`, `=`, `<>`)
 - `additive_expression` — `+`, `-`
-- `multiplicative_expression` — `*`, `/`
+- `multiplicative_expression` — `*`, `/`, `mod`, `div`
 - `logical_expression` — `and`, `or`
-- `call_expression` — method calls (for statement removal and BC-specific mutations)
+- `unary_expression` — `not`
+- `call_expression` — method calls (statement removal, BC-specific)
 
-Because the AST distinguishes executable code from metadata, comments, and strings,
-no separate context filtering is needed.
+Because the AL compiler's syntax tree distinguishes executable code from metadata, comments,
+and strings, no separate context filtering is needed.
+
+## AL Runner Integration
+
+Test execution is handled by a project reference to `../BusinessCentral.AL.Runner`.
+The `AlRunnerTestRunner` class calls `AlRunnerPipeline.Run()` with the test app path and
+connection settings. This runs tests in-process — no external shell scripts or BC container
+tooling required.
+
+## Test Layers
+
+| Layer | Scope | Runner |
+|-------|-------|--------|
+| Unit tests | Individual classes (scanner, mutator, log, report, operators) | `FakeTestRunner` — no BC needed |
+| Integration tests | Full `MutationPipeline` against a real AL project | Real `AlRunnerPipeline` — requires BC instance |
+
+Run unit tests with: `dotnet test --filter "Category!=Integration"`
 
 ## Execution Flow
 
@@ -64,19 +84,20 @@ STARTUP
   - Load and validate operator definitions
 
 BASELINE
-  - Compile + publish + run tests on unmodified code
+  - Compile + run tests via AL Runner on unmodified code
   - Abort if baseline fails
 
 REPLAY (if mutations.json exists)
   - For each SURVIVED mutation from last run:
     - If original line no longer exists → OBSOLETE
-    - Apply → compile → publish → test → restore
+    - Apply → compile → test → restore
     - Record: KILLED or SURVIVED
 
 NEW MUTATIONS
-  - Parse .al files with tree-sitter
-  - Walk AST, match operators to node types
-  - For each candidate: apply → compile → publish → test → restore
+  - Walk NavSyntaxTree for each .al file
+  - Match operators to node types, build candidate list
+  - Skip candidates already recorded in mutations.json
+  - For each candidate: apply → compile → test → restore
   - Record result
 
 REPORT
@@ -85,22 +106,9 @@ REPORT
   - Print summary: score, survivors, required fixes
 ```
 
-## Linux Stack Integration
-
-The tool calls external commands for compile/publish/test:
-
-| Step | Command |
-|------|---------|
-| Compile | `al-compile` |
-| Publish | `bc-publish` |
-| Run tests | `/opt/bc-linux/scripts/run-tests.sh` |
-| Restore | `git checkout -- <file>` |
-
-These are expected to be available on PATH in the dev container environment.
-
 ## Mutation Log
 
-Results are persisted to `mutations.json` (append-only):
+Results are persisted to `mutations.json` (append-only, `schema_version: 1`):
 
 - **KILLED** — tests caught the mutation
 - **SURVIVED** — tests still passed (test gap)
