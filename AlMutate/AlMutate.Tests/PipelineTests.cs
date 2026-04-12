@@ -305,18 +305,170 @@ public class PipelineTests
     }
 
     // -----------------------------------------------------------------------
-    // Replay_NotImplemented_Throws
+    // Replay_NoSurvivedMutations_ReturnsEmptyResult
     // -----------------------------------------------------------------------
     [Fact]
-    public void Replay_NotImplemented_Throws()
+    public void Replay_NoSurvivedMutations_ReturnsEmptyResult()
     {
-        var pipeline = MakePipeline();
-
-        Assert.Throws<NotImplementedException>(() => pipeline.Replay(new PipelineOptions
+        var tempDir = CreateTempGitRepo(FixturesDir);
+        try
         {
-            LogFilePath = "mutations.json",
-            TestPath = "/dev/null"
-        }));
+            // Create a log with one KILLED mutation (no survivors)
+            var logPath = Path.Combine(tempDir, "mutations.json");
+            var killedResult = new MutationResult(
+                "M001", "rel-gt-to-gte",
+                Path.Combine(tempDir, "sample.al"),
+                9, "        if Amount > 0 then begin", "        if Amount >= 0 then begin",
+                MutationStatus.Killed, "SomeTest");
+            var log = MutationLog.Create(logPath, tempDir);
+            log.AppendRun(new List<MutationResult> { killedResult });
+            log.Save();
+
+            var pipeline = new MutationPipeline(
+                new FakeTestRunner(passed: true), operatorsPath: null);
+
+            var result = pipeline.Replay(new PipelineOptions
+            {
+                LogFilePath = logPath,
+                TestPath = "/dev/null",
+                Silent = true
+            });
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Empty(result.Results);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Replay_SurvivedMutationNowKilled_StatusIsKilled
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void Replay_SurvivedMutationNowKilled_StatusIsKilled()
+    {
+        var tempDir = CreateTempGitRepo(FixturesDir);
+        try
+        {
+            var alFile = Path.Combine(tempDir, "sample.al");
+            var logPath = Path.Combine(tempDir, "mutations.json");
+
+            // Create a log with a SURVIVED mutation targeting an actual line in sample.al
+            var survivedResult = new MutationResult(
+                "M001", "rel-gt-to-gte",
+                alFile,
+                9, "        if Amount > 0 then begin", "        if Amount >= 0 then begin",
+                MutationStatus.Survived, null);
+            var log = MutationLog.Create(logPath, tempDir);
+            log.AppendRun(new List<MutationResult> { survivedResult });
+            log.Save();
+
+            // Replay with a runner that kills mutations (tests fail on mutant)
+            var pipeline = new MutationPipeline(
+                new FakeTestRunner(passed: false, failedTests: new List<string> { "SomeTest" }),
+                operatorsPath: null);
+
+            var result = pipeline.Replay(new PipelineOptions
+            {
+                LogFilePath = logPath,
+                TestPath = "/dev/null",
+                Silent = true
+            });
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Single(result.Results);
+            Assert.Equal(MutationStatus.Killed, result.Results[0].Status);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Replay_SurvivedMutationStillSurvives_StatusIsSurvived
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void Replay_SurvivedMutationStillSurvives_StatusIsSurvived()
+    {
+        var tempDir = CreateTempGitRepo(FixturesDir);
+        try
+        {
+            var alFile = Path.Combine(tempDir, "sample.al");
+            var logPath = Path.Combine(tempDir, "mutations.json");
+
+            var survivedResult = new MutationResult(
+                "M001", "rel-gt-to-gte",
+                alFile,
+                9, "        if Amount > 0 then begin", "        if Amount >= 0 then begin",
+                MutationStatus.Survived, null);
+            var log = MutationLog.Create(logPath, tempDir);
+            log.AppendRun(new List<MutationResult> { survivedResult });
+            log.Save();
+
+            // Replay with a runner that still passes (mutation still survives)
+            var pipeline = new MutationPipeline(
+                new FakeTestRunner(passed: true), operatorsPath: null);
+
+            var result = pipeline.Replay(new PipelineOptions
+            {
+                LogFilePath = logPath,
+                TestPath = "/dev/null",
+                Silent = true
+            });
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Single(result.Results);
+            Assert.Equal(MutationStatus.Survived, result.Results[0].Status);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Replay_ObsoleteMutation_StatusIsObsolete
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void Replay_ObsoleteMutation_StatusIsObsolete()
+    {
+        var tempDir = CreateTempGitRepo(FixturesDir);
+        try
+        {
+            var alFile = Path.Combine(tempDir, "sample.al");
+            var logPath = Path.Combine(tempDir, "mutations.json");
+
+            // Create a log with a SURVIVED mutation whose Original text no longer exists
+            var survivedResult = new MutationResult(
+                "M001", "rel-gt-to-gte",
+                alFile,
+                9, "        if Amount > 99999 then begin", "        if Amount >= 99999 then begin",
+                MutationStatus.Survived, null);
+            var log = MutationLog.Create(logPath, tempDir);
+            log.AppendRun(new List<MutationResult> { survivedResult });
+            log.Save();
+
+            var pipeline = new MutationPipeline(
+                new FakeTestRunner(passed: true), operatorsPath: null);
+
+            var result = pipeline.Replay(new PipelineOptions
+            {
+                LogFilePath = logPath,
+                TestPath = "/dev/null",
+                Silent = true
+            });
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Single(result.Results);
+            Assert.Equal(MutationStatus.Obsolete, result.Results[0].Status);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
     }
 
     // -----------------------------------------------------------------------

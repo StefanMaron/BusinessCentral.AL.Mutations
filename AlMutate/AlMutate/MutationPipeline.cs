@@ -213,10 +213,119 @@ public class MutationPipeline
 
     /// <summary>
     /// Replay survived mutations from a previous log.
+    /// Re-runs all SURVIVED mutations from the most recent run to check whether
+    /// improved tests now kill them.
     /// </summary>
     public PipelineResult Replay(PipelineOptions options)
     {
-        throw new NotImplementedException("Replay not yet implemented");
+        void Log(string msg) { if (!options.Silent) Console.WriteLine(msg); }
+
+        var logPath = options.LogFilePath ?? "mutations.json";
+        var log = MutationLog.Load(logPath);
+
+        var survived = log.GetSurvivedFromLastRun();
+        Log($"Replaying {survived.Count} survived mutation(s)...");
+
+        if (survived.Count == 0)
+        {
+            var emptyReport = ReportGenerator.GenerateMarkdown(new List<MutationResult>(), log.SourcePath);
+            return new PipelineResult(0, new List<MutationResult>(), 1.0, emptyReport);
+        }
+
+        var sourcePath = log.SourcePath;
+        var testPath = options.TestPath ?? "";
+        var results = new List<MutationResult>();
+
+        int index = 0;
+        int total = survived.Count;
+        foreach (var mutation in survived)
+        {
+            index++;
+            MutationStatus status;
+            string? caughtBy = null;
+
+            // Check if the original line still exists in the file
+            if (!FileContainsOriginal(mutation.File, mutation.Line, mutation.Original))
+            {
+                Log($"  [{index}/{total}] {mutation.Id} [{mutation.Operator}] {Path.GetFileName(mutation.File)}:{mutation.Line} → OBSOLETE");
+                results.Add(mutation with { Status = MutationStatus.Obsolete });
+                continue;
+            }
+
+            var candidate = new MutationCandidate(
+                mutation.File,
+                mutation.Line,
+                mutation.Operator,
+                mutation.Original,
+                mutation.Mutated);
+
+            try
+            {
+                Mutator.Apply(candidate);
+                var testResult = _runner.RunTests(sourcePath, testPath, options.StubsPath);
+                GitService.RestoreFile(candidate.File);
+
+                if (testResult.CompileError)
+                    status = MutationStatus.CompileError;
+                else if (testResult.Passed)
+                    status = MutationStatus.Survived;
+                else
+                {
+                    status = MutationStatus.Killed;
+                    caughtBy = testResult.FailedTests.FirstOrDefault();
+                }
+            }
+            catch (MutationException)
+            {
+                try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
+                status = MutationStatus.CompileError;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error replaying {mutation.Id}: {ex.GetType().Name}: {ex.Message}");
+                try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
+                status = MutationStatus.CompileError;
+            }
+
+            var statusLabel = status switch
+            {
+                MutationStatus.Killed => "KILLED",
+                MutationStatus.Survived => "SURVIVED",
+                MutationStatus.CompileError => "COMPILE_ERROR",
+                MutationStatus.TimedOut => "TIMED_OUT",
+                _ => status.ToString().ToUpperInvariant()
+            };
+            Log($"  [{index}/{total}] {mutation.Id} [{mutation.Operator}] {Path.GetFileName(mutation.File)}:{mutation.Line} → {statusLabel}");
+
+            results.Add(mutation with { Status = status, CaughtBy = caughtBy });
+        }
+
+        // Append run and save log
+        log.AppendRun(results);
+        log.Save();
+
+        // Generate report
+        var score = ReportGenerator.CalculateScore(results);
+        var report = ReportGenerator.GenerateMarkdown(results, sourcePath);
+
+        return new PipelineResult(0, results, score, report);
+    }
+
+    /// <summary>
+    /// Checks whether a file's line at <paramref name="line"/> (1-based) matches
+    /// <paramref name="original"/>. Returns false if the line is out of range or
+    /// the content differs (mutation is OBSOLETE).
+    /// </summary>
+    private static bool FileContainsOriginal(string filePath, int line, string original)
+    {
+        if (!File.Exists(filePath))
+            return false;
+
+        var lines = File.ReadAllLines(filePath);
+        if (line < 1 || line > lines.Length)
+            return false;
+
+        return lines[line - 1] == original;
     }
 
     private static string FormatElapsed(TimeSpan elapsed) =>

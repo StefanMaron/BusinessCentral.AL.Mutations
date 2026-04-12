@@ -75,6 +75,9 @@ public class MutationLog
             .ToList();
     }
 
+    /// <summary>The source project path this log belongs to.</summary>
+    public string SourcePath => _data.Project;
+
     /// <summary>
     /// Returns the next mutation ID: "M001", "M002", etc., incrementing on each call.
     /// The counter is seeded from all existing runs so IDs are unique across the log's lifetime.
