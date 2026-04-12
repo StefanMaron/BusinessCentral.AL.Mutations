@@ -11,7 +11,7 @@ The core concept: apply mutations, run tests, report survivors.
 
 - **C# .NET 8** — `dotnet tool install --global MSDyn365BC.AL.Mutate`
 - **`Microsoft.Dynamics.Nav.CodeAnalysis`** — AST-based mutation scanning (`NavSyntaxTree` / `NavSyntaxWalker`)
-- **AL Runner** (`../BusinessCentral.AL.Runner`) — project reference for in-process test execution
+- **AL Runner** (`msdyn365bc.al.runner`) — NuGet global tool, auto-installed at runtime if missing
 - **`git checkout -- <file>`** — mutation restore (requires clean working tree — enforced at startup)
 
 > The old Python implementation in `al_mutate/` is gone. The old PowerShell module (`BCMutations/`) is also gone.
@@ -61,7 +61,7 @@ dotnet test AlMutate/AlMutate.slnx
 | `AlScanner` | Walks NavSyntaxTree, matches operators to node types, returns candidates |
 | `Mutator` | Applies and restores mutations (restore always via `git checkout`) |
 | `GitService` | Checks working tree cleanliness, performs restore |
-| `AlRunnerTestRunner` | Integrates with AL Runner (`AlRunnerPipeline.Run()`) |
+| `AlRunnerTestRunner` | Calls the `al-runner` CLI subprocess; auto-installs if missing |
 | `MutationLog` | Reads/writes `mutations.json` (append-only) |
 | `ReportGenerator` | Generates `report.md` and prints summary |
 | `OperatorLoader` | Loads and validates operator JSON (embedded resource or custom file) |

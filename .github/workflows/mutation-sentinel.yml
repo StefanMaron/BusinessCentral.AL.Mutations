@@ -16,12 +16,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Checkout AL Runner
-        uses: actions/checkout@v4
-        with:
-          repository: StefanMaron/BusinessCentral.AL.Runner
-          path: BusinessCentral.AL.Runner
-
       - name: Checkout BusinessCentral.Sentinel
         uses: actions/checkout@v4
         with:
@@ -34,9 +28,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Build al-mutate
-        run: |
-          dotnet build AlMutate/AlMutate/AlMutate.csproj \
-            -p:ALRunnerProjectPath=$GITHUB_WORKSPACE/BusinessCentral.AL.Runner/AlRunner/AlRunner.csproj
+        run: dotnet build AlMutate/AlMutate/AlMutate.csproj
 
       - name: Scan mutations (dry run)
         run: |

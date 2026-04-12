@@ -93,13 +93,14 @@ public class TestRunnerTests
     // AlRunnerTestRunner_NonExistentPath_ReturnsCompileError
     // -----------------------------------------------------------------------
     [Fact]
+    [Trait("Category", "Integration")]
     public void AlRunnerTestRunner_NonExistentPath_ReturnsCompileError()
     {
         var runner = new AlRunnerTestRunner();
 
         var result = runner.RunTests("/nonexistent/path/src", "/nonexistent/path/test");
 
-        // Non-existent paths: pipeline returns exit code != 0, no tests collected
+        // Non-existent paths: al-runner returns exit code != 0, no tests collected
         Assert.False(result.Passed);
         Assert.True(result.CompileError);
     }
