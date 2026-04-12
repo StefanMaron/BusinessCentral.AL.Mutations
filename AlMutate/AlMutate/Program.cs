@@ -50,7 +50,7 @@ Options:
   --tests <path>      (Required) Path to AL test source directory
   --stubs <path>      Path to stub AL files directory (excluded from mutation scanning;
                       passed to al-runner alongside source and tests)
-  --operators <path>  Path to custom operators JSON file (default: built-in 55 operators)
+  --operators <path>  Path to custom operators JSON file (default: built-in 54 operators)
   --max <n>           Limit to first N mutation candidates (useful for sampling or CI)
   --log <path>        Output path for mutations.json (default: mutations.json in CWD)
   --timeout <secs>    Per-mutation test-run time limit in seconds (default: 300).
@@ -141,7 +141,7 @@ var scanSourceArg = new Argument<string>(
 
 var scanOperatorsOption = new Option<string?>(
     "--operators",
-    "Path to custom operators JSON file (default: built-in 55 operators across 8 categories)");
+    "Path to custom operators JSON file (default: built-in 54 operators across 8 categories)");
 
 var scanCommand = new Command(
     "scan",
@@ -200,7 +200,7 @@ var runStubsOption = new Option<string?>(
 
 var runOperatorsOption = new Option<string?>(
     "--operators",
-    "Path to custom operators JSON file (default: built-in 55 operators across 8 categories)");
+    "Path to custom operators JSON file (default: built-in 54 operators across 8 categories)");
 
 var runMaxOption = new Option<int?>(
     "--max",

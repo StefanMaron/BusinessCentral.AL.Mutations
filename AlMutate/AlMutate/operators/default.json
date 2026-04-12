@@ -280,14 +280,6 @@
       "replacement": null
     },
     {
-      "id": "stmt-remove-get",
-      "name": "Remove Get call",
-      "category": "statement-removal",
-      "node_type": "call_expression",
-      "identifier": "Get",
-      "replacement": null
-    },
-    {
       "id": "stmt-remove-modifyall",
       "name": "Remove ModifyAll call",
       "category": "statement-removal",
