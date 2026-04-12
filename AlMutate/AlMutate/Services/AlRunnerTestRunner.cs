@@ -6,9 +6,11 @@ namespace AlMutate.Services;
 
 public class AlRunnerTestRunner : ITestRunner
 {
+    private const string AlRunnerVersion = "1.0.5";
+
     public TestRunResult RunTests(string sourcePath, string testPath, string? stubsPath = null)
     {
-        EnsureAlRunnerInstalled();
+        var alRunnerPath = EnsureAlRunnerInstalled();
 
         // Build the file list: find all *.al files in each directory
         var alFiles = new List<string>();
@@ -20,7 +22,11 @@ public class AlRunnerTestRunner : ITestRunner
         // Run: al-runner --output-json <files...>
         var quotedFiles = string.Join(" ", alFiles.Select(f => $"\"{f}\""));
         var args = $"--output-json {quotedFiles}";
-        var (exitCode, stdout, _) = RunProcess("al-runner", args);
+        var (exitCode, stdout, stderr) = RunProcess(alRunnerPath, args);
+
+        // Forward al-runner stderr so failures are visible in CI logs
+        if (!string.IsNullOrWhiteSpace(stderr))
+            Console.Error.WriteLine(stderr);
 
         // Parse JSON output
         // Format: {"exitCode":0,"passed":3,"failed":0,"errors":0,"tests":[{"name":"...","status":"pass",...}]}
@@ -49,17 +55,28 @@ public class AlRunnerTestRunner : ITestRunner
             CompileError: compileError);
     }
 
-    private static void EnsureAlRunnerInstalled()
+    /// <summary>
+    /// Returns the path to the al-runner executable, installing it if necessary.
+    /// Uses the full path after install to avoid PATH refresh issues.
+    /// </summary>
+    private static string EnsureAlRunnerInstalled()
     {
-        // Check if al-runner is available
-        var (exitCode, _, _) = RunProcess("al-runner", "--version", ignoreErrors: true);
-        if (exitCode == 0) return;
+        // Try al-runner on PATH first (already installed)
+        var (exitCode, _, _) = RunProcess("al-runner", "--help", ignoreErrors: true);
+        if (exitCode == 0) return "al-runner";
 
-        // Install it
-        Console.WriteLine("al-runner not found. Installing msdyn365bc.al.runner...");
-        var (installCode, _, stderr) = RunProcess("dotnet", "tool install --global msdyn365bc.al.runner");
+        // Install it as a global tool
+        Console.WriteLine($"al-runner not found. Installing msdyn365bc.al.runner@{AlRunnerVersion}...");
+        var (installCode, _, installErr) = RunProcess(
+            "dotnet", $"tool install --global msdyn365bc.al.runner --version {AlRunnerVersion}");
         if (installCode != 0)
-            throw new MutationException($"Failed to install al-runner: {stderr}");
+            throw new MutationException($"Failed to install al-runner: {installErr}");
+
+        // After install, the binary is in ~/.dotnet/tools/ which may not be in the current
+        // process's PATH yet — use the full path explicitly.
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var exe = OperatingSystem.IsWindows() ? "al-runner.exe" : "al-runner";
+        return Path.Combine(home, ".dotnet", "tools", exe);
     }
 
     private static (int ExitCode, string Stdout, string Stderr) RunProcess(
