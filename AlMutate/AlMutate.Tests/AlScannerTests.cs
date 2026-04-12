@@ -316,4 +316,64 @@ public class AlScannerTests
         var hit = candidates.FirstOrDefault(c => c.OperatorId.StartsWith("bc-"));
         Assert.NotNull(hit);
     }
+
+    // -----------------------------------------------------------------------
+    // Edge case: string concatenation must not produce arith-add-to-sub
+    // -----------------------------------------------------------------------
+
+    private static readonly string EdgeCasesFile = Path.Combine(FixturesDir, "EdgeCases.al");
+
+    [Fact]
+    public void ScanFile_StringConcatenation_NoArithAddToSubCandidate()
+    {
+        var candidates = AlScanner.ScanFile(EdgeCasesFile, DefaultOperators());
+
+        // The StringConcat procedure uses '+' on Text operands.
+        // arith-add-to-sub must not fire because '-' is not valid for Text in AL.
+        var bad = candidates
+            .Where(c => c.OperatorId == "arith-add-to-sub" && c.Original.Contains("Name + ' ' + Suffix"))
+            .ToList();
+
+        Assert.Empty(bad);
+    }
+
+    // -----------------------------------------------------------------------
+    // Edge case: boolean literals inside [EventSubscriber] attributes
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void ScanFile_EventSubscriberAttribute_NoBoolMutationsInsideAttribute()
+    {
+        var candidates = AlScanner.ScanFile(EdgeCasesFile, DefaultOperators());
+
+        // The attribute line contains 'true' and 'false' as attribute arguments.
+        // bool-true-to-false and bool-false-to-true must NOT generate candidates
+        // for them because mutating attribute parameters causes AL compile errors.
+        var bad = candidates
+            .Where(c =>
+                (c.OperatorId == "bool-true-to-false" || c.OperatorId == "bool-false-to-true") &&
+                c.Original.Contains("[EventSubscriber"))
+            .ToList();
+
+        Assert.Empty(bad);
+    }
+
+    // -----------------------------------------------------------------------
+    // Edge case: no duplicate candidates — same (file, line, original, mutated)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void ScanFile_NoDuplicateCandidates_SameTransformation()
+    {
+        var candidates = AlScanner.ScanFile(EdgeCasesFile, DefaultOperators());
+
+        // bc-insert-trigger-true and bool-true-to-false both match Insert(true)
+        // and produce identical mutations.  After deduplication only one should remain.
+        var duplicates = candidates
+            .GroupBy(c => (c.File, c.Line, c.Original, c.Mutated))
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        Assert.Empty(duplicates);
+    }
 }

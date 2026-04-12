@@ -20,7 +20,15 @@ public static class AlScanner
 
         var visitor = new MutationVisitor(tree, lines, absPath, operators);
         visitor.Visit(root);
-        return visitor.Candidates;
+
+        // Deduplicate: multiple operators can produce the same (file, line, original, mutated)
+        // transformation (e.g. bc-insert-trigger-true and bool-true-to-false both turn
+        // Insert(true) into Insert(false)).  Keep only the first occurrence of each unique
+        // transformation so each mutation is executed exactly once.
+        return visitor.Candidates
+            .GroupBy(c => (c.File, c.Line, c.Original, c.Mutated))
+            .Select(g => g.First())
+            .ToList();
     }
 
     /// <summary>
@@ -107,8 +115,10 @@ public static class AlScanner
                 : string.Empty;
 
         /// <summary>
-        /// Returns true when the node is inside a MethodDeclaration or TriggerDeclaration body.
-        /// Property declarations and object-level attributes are excluded.
+        /// Returns true when the node is inside the body of a MethodDeclaration or TriggerDeclaration.
+        /// Nodes inside attribute argument lists (e.g. [EventSubscriber(..., true, false)]) return
+        /// false even though the attribute is attached to a method, because mutating attribute
+        /// parameters causes AL compile errors.
         /// </summary>
         private static bool IsInsideProcedureBody(SyntaxNode node)
         {
@@ -118,6 +128,12 @@ public static class AlScanner
                 var kind = parent.Kind;
                 if (kind == SyntaxKind.MethodDeclaration || kind == SyntaxKind.TriggerDeclaration)
                     return true;
+                // Attribute argument nodes sit between the literal and the MethodDeclaration in
+                // the tree.  Stop early so we don't misidentify attribute args as procedure body.
+                if (kind == SyntaxKind.LiteralAttributeArgument
+                    || kind == SyntaxKind.AttributeArgumentList
+                    || kind == SyntaxKind.MemberAttribute)
+                    return false;
                 parent = parent.Parent;
             }
             return false;
@@ -230,11 +246,20 @@ public static class AlScanner
                     && _tokenOps.TryGetValue(nodeType, out var byToken)
                     && byToken.TryGetValue(opText, out var ops))
                 {
-                    foreach (var op in ops)
+                    // Skip arith-add-to-sub (and any other additive operator) when the
+                    // expression is string concatenation.  In AL, '+' concatenates Text/Code
+                    // values; replacing it with '-' is a type error that causes a compile error.
+                    bool isStringConcat = node.Kind == SyntaxKind.AddExpression
+                        && ContainsStringLiteral(node);
+
+                    if (!isStringConcat)
                     {
-                        var candidate = BuildTokenReplacement(node, op.Id, opText, op.Replacement!);
-                        if (candidate != null)
-                            Candidates.Add(candidate);
+                        foreach (var op in ops)
+                        {
+                            var candidate = BuildTokenReplacement(node, op.Id, opText, op.Replacement!);
+                            if (candidate != null)
+                                Candidates.Add(candidate);
+                        }
                     }
                 }
             }
@@ -265,6 +290,23 @@ public static class AlScanner
             }
 
             base.VisitUnaryExpression(node);
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="node"/> or any of its descendants is a string literal.
+        /// Used to detect string concatenation chains so arith-add-to-sub is not applied to them.
+        /// </summary>
+        private static bool ContainsStringLiteral(SyntaxNode node)
+        {
+            if (node is LiteralExpressionSyntax lit
+                && lit.Literal.Kind == SyntaxKind.StringLiteralValue)
+                return true;
+
+            foreach (var child in node.ChildNodes())
+                if (ContainsStringLiteral(child))
+                    return true;
+
+            return false;
         }
 
         private static string RemoveNotPrefix(string line, string nodeText)
