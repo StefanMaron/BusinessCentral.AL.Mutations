@@ -48,14 +48,18 @@ public class MutationPipeline
     /// </summary>
     public async Task<PipelineResult> RunAsync(PipelineOptions options)
     {
+        void Log(string msg) { if (!options.Silent) Console.WriteLine(msg); }
+
         // 1. Check git clean (relative to the source directory)
         if (!GitService.IsWorkingTreeClean(options.SourcePath))
             return new PipelineResult(1, new List<MutationResult>(), 0.0, null, "Working tree is dirty");
 
         // 2. Scan candidates
+        Log("Scanning for mutation candidates...");
         var candidates = AlScanner.ScanDirectory(options.SourcePath, _operators);
         if (options.MaxMutations.HasValue)
             candidates = candidates.Take(options.MaxMutations.Value).ToList();
+        Log($"Found {candidates.Count} candidate(s).");
 
         // 3. Resolve the effective runner: use server mode when runner is AlRunnerTestRunner
         //    for incremental compilation (cache hit on unchanged files).
@@ -65,6 +69,7 @@ public class MutationPipeline
 
         if (_runner is AlRunnerTestRunner)
         {
+            Log("Starting al-runner server...");
             var alRunnerPath = AlRunnerTestRunner.GetAlRunnerPath();
             server = await AlRunnerServer.StartAsync(alRunnerPath);
             effectiveRunner = server;
@@ -73,9 +78,11 @@ public class MutationPipeline
         try
         {
             // 4. Run baseline
+            Log("Running baseline tests...");
             var baseline = effectiveRunner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
             if (!baseline.Passed && !baseline.CompileError)
                 return new PipelineResult(1, new List<MutationResult>(), 0.0, null, "Baseline tests failed");
+            Log("Baseline passed.");
 
             // 5. Load or create log
             var logPath = options.LogFilePath ?? "mutations.json";
@@ -85,8 +92,11 @@ public class MutationPipeline
 
             // 6. Run each mutation
             var results = new List<MutationResult>();
+            int total = candidates.Count;
+            int index = 0;
             foreach (var candidate in candidates)
             {
+                index++;
                 var id = log.NextMutationId();
                 MutationStatus status;
                 string? caughtBy = null;
@@ -112,6 +122,16 @@ public class MutationPipeline
                     try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
                     status = MutationStatus.CompileError;
                 }
+
+                var statusLabel = status switch
+                {
+                    MutationStatus.Killed => "KILLED",
+                    MutationStatus.Survived => "SURVIVED",
+                    MutationStatus.CompileError => "COMPILE_ERROR",
+                    _ => status.ToString().ToUpperInvariant()
+                };
+                var shortFile = Path.GetFileName(candidate.File);
+                Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → {statusLabel}");
 
                 results.Add(new MutationResult(
                     id,

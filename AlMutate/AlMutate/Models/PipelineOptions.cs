@@ -9,4 +9,6 @@ public record PipelineOptions
     public string? OperatorsPath { get; init; }
     public string? LogFilePath { get; init; }
     public int? MaxMutations { get; init; }
+    /// <summary>When true, suppress all progress output; only errors go to stderr.</summary>
+    public bool Silent { get; init; }
 }
