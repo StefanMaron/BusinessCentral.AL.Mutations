@@ -101,6 +101,7 @@ public class MutationPipeline
                 MutationStatus status;
                 string? caughtBy = null;
 
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     Mutator.Apply(candidate);
@@ -122,6 +123,7 @@ public class MutationPipeline
                     try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
                     status = MutationStatus.CompileError;
                 }
+                sw.Stop();
 
                 var statusLabel = status switch
                 {
@@ -131,7 +133,10 @@ public class MutationPipeline
                     _ => status.ToString().ToUpperInvariant()
                 };
                 var shortFile = Path.GetFileName(candidate.File);
-                Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → {statusLabel}");
+                var elapsed = sw.Elapsed.TotalSeconds >= 1
+                    ? $"{sw.Elapsed.TotalSeconds:F1}s"
+                    : $"{sw.Elapsed.TotalMilliseconds:F0}ms";
+                Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → {statusLabel} ({elapsed})");
 
                 results.Add(new MutationResult(
                     id,
