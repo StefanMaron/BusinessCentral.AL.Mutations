@@ -55,7 +55,8 @@
       "category": "arithmetic",
       "node_type": "additive_expression",
       "operator_token": "+",
-      "replacement": "-"
+      "replacement": "-",
+      "skip_string_operands": true
     },
     {
       "id": "arith-sub-to-add",

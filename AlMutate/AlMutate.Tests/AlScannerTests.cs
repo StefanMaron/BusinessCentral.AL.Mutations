@@ -318,23 +318,45 @@ public class AlScannerTests
     }
 
     // -----------------------------------------------------------------------
-    // Edge case: string concatenation must not produce arith-add-to-sub
+    // Edge case: skip_string_operands operator flag
     // -----------------------------------------------------------------------
 
     private static readonly string EdgeCasesFile = Path.Combine(FixturesDir, "EdgeCases.al");
 
     [Fact]
-    public void ScanFile_StringConcatenation_NoArithAddToSubCandidate()
+    public void ScanFile_StringConcatenation_SkipStringOperandsFlag_SuppressesCandidate()
     {
+        // arith-add-to-sub has skip_string_operands: true in default.json.
+        // It must NOT fire on a Text '+' expression.
         var candidates = AlScanner.ScanFile(EdgeCasesFile, DefaultOperators());
 
-        // The StringConcat procedure uses '+' on Text operands.
-        // arith-add-to-sub must not fire because '-' is not valid for Text in AL.
         var bad = candidates
             .Where(c => c.OperatorId == "arith-add-to-sub" && c.Original.Contains("Name + ' ' + Suffix"))
             .ToList();
 
         Assert.Empty(bad);
+    }
+
+    [Fact]
+    public void ScanFile_StringConcatenation_WithoutFlag_ProducesCandidate()
+    {
+        // An operator targeting '+' WITHOUT skip_string_operands: true must still
+        // fire on string concatenation — the flag is opt-in, not a universal filter.
+        var op = new MutationOperator(
+            Id: "test-add-to-sub",
+            Name: "test",
+            Category: "arithmetic",
+            NodeType: "additive_expression",
+            OperatorToken: "+",
+            Identifier: null,
+            ArgumentMatch: null,
+            IdentifierReplacement: null,
+            Replacement: "-");   // no SkipStringOperands
+
+        var candidates = AlScanner.ScanFile(EdgeCasesFile, new List<MutationOperator> { op });
+
+        Assert.Contains(candidates, c =>
+            c.OperatorId == "test-add-to-sub" && c.Original.Contains("Name + ' ' + Suffix"));
     }
 
     // -----------------------------------------------------------------------

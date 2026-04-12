@@ -246,20 +246,19 @@ public static class AlScanner
                     && _tokenOps.TryGetValue(nodeType, out var byToken)
                     && byToken.TryGetValue(opText, out var ops))
                 {
-                    // Skip arith-add-to-sub (and any other additive operator) when the
-                    // expression is string concatenation.  In AL, '+' concatenates Text/Code
-                    // values; replacing it with '-' is a type error that causes a compile error.
-                    bool isStringConcat = node.Kind == SyntaxKind.AddExpression
-                        && ContainsStringLiteral(node);
-
-                    if (!isStringConcat)
+                    foreach (var op in ops)
                     {
-                        foreach (var op in ops)
-                        {
-                            var candidate = BuildTokenReplacement(node, op.Id, opText, op.Replacement!);
-                            if (candidate != null)
-                                Candidates.Add(candidate);
-                        }
+                        // When skip_string_operands is set on the operator, skip AddExpression
+                        // nodes that contain a string literal — in AL, '+' doubles as text
+                        // concatenation and replacing it with '-' is a type error.
+                        if (op.SkipStringOperands
+                            && node.Kind == SyntaxKind.AddExpression
+                            && ContainsStringLiteral(node))
+                            continue;
+
+                        var candidate = BuildTokenReplacement(node, op.Id, opText, op.Replacement!);
+                        if (candidate != null)
+                            Candidates.Add(candidate);
                     }
                 }
             }
