@@ -56,7 +56,7 @@
   <Target Name="EnsureALCompiler" BeforeTargets="ResolveAssemblyReferences"
           Condition="!Exists('$(ALCompilerPath)/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">
     <Message Importance="high" Text="AL compiler not found. Downloading from NuGet..." />
-    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)/../../tools/DownloadArtifacts&quot; -- al-compiler $(_ALToolVersion) &quot;$(ALCompilerPath)&quot;" />
+    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)/../tools/DownloadArtifacts&quot; -- al-compiler $(_ALToolVersion) &quot;$(ALCompilerPath)&quot;" />
   </Target>
 
 </Project>
