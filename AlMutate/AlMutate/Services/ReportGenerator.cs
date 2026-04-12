@@ -28,6 +28,7 @@ public static class ReportGenerator
         var survived = results.Count(r => r.Status == MutationStatus.Survived);
         var compileError = results.Count(r => r.Status == MutationStatus.CompileError);
         var obsolete = results.Count(r => r.Status == MutationStatus.Obsolete);
+        var timedOut = results.Count(r => r.Status == MutationStatus.TimedOut);
 
         var sb = new StringBuilder();
         sb.AppendLine($"# Mutation Testing Report — {project}");
@@ -36,9 +37,9 @@ public static class ReportGenerator
         sb.AppendLine();
         sb.AppendLine("## Summary");
         sb.AppendLine();
-        sb.AppendLine("| Killed | Survived | Compile Error | Obsolete |");
-        sb.AppendLine("|--------|----------|---------------|----------|");
-        sb.AppendLine($"| {killed} | {survived} | {compileError} | {obsolete} |");
+        sb.AppendLine("| Killed | Survived | Compile Error | Timed Out | Obsolete |");
+        sb.AppendLine("|--------|----------|---------------|-----------|----------|");
+        sb.AppendLine($"| {killed} | {survived} | {compileError} | {timedOut} | {obsolete} |");
         sb.AppendLine();
         sb.AppendLine("## Survivors");
         sb.AppendLine();

@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace AlMutate.Models;
 
-public enum MutationStatus { Killed, Survived, CompileError, Obsolete }
+public enum MutationStatus { Killed, Survived, CompileError, Obsolete, TimedOut }
 
 public record MutationResult(
     [property: JsonPropertyName("id")] string Id,

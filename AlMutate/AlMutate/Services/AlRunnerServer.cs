@@ -54,10 +54,9 @@ internal sealed class AlRunnerServer : ITestRunner, IAsyncDisposable
         return new AlRunnerServer(proc);
     }
 
-    // Per-mutation timeout: al-runner should compile + run within this window.
-    // 5 minutes is generous even for large projects; keeps CI from hanging forever
-    // if the server process deadlocks.
-    private static readonly TimeSpan ResponseTimeout = TimeSpan.FromMinutes(5);
+    // Per-mutation timeout. AL compilation + test run should complete well within
+    // this window; keeps CI from hanging forever if the server process deadlocks.
+    private static readonly TimeSpan ResponseTimeout = TimeSpan.FromMinutes(3);
 
     /// <summary>
     /// ITestRunner implementation — sends a runTests command to the server and
@@ -78,19 +77,30 @@ internal sealed class AlRunnerServer : ITestRunner, IAsyncDisposable
             SourcePaths = sourcePaths.ToArray()
         });
 
-        // Send request and read response with a timeout so a hung server
-        // cannot block the pipeline indefinitely.
+        // Send request and read response. The pipeline-level MutationTimeout races
+        // against the test run task; if that fires first, the pipeline moves on.
+        // We still use a generous server-side deadline here as a last-resort safety net
+        // in case the server process hangs before the pipeline timeout can fire.
         _process.StandardInput.WriteLine(request);
         _process.StandardInput.Flush();
 
-        using var cts = new CancellationTokenSource(ResponseTimeout);
-        var readTask = _process.StandardOutput.ReadLineAsync(cts.Token).AsTask();
+        var readTask = Task.Run(() => _process.StandardOutput.ReadLine());
         if (!readTask.Wait(ResponseTimeout))
             throw new MutationException(
-                $"al-runner server did not respond within {ResponseTimeout.TotalMinutes:F0} minutes");
+                $"al-runner server did not respond within {(int)ResponseTimeout.TotalMinutes} minutes");
 
-        var responseLine = readTask.Result
-            ?? throw new MutationException("al-runner server closed stdout before responding");
+        string? responseLine;
+        try
+        {
+            responseLine = readTask.GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            throw new MutationException($"al-runner server read error: {ex.Message}");
+        }
+
+        if (responseLine == null)
+            throw new MutationException("al-runner server closed stdout before responding");
 
         ServerRunTestsResponse? response;
         try
@@ -103,7 +113,7 @@ internal sealed class AlRunnerServer : ITestRunner, IAsyncDisposable
         }
 
         if (response == null)
-            throw new MutationException($"al-runner server returned null response: {responseLine}");
+            throw new MutationException($"al-runner server returned null response: {responseLine!}");
 
         if (response.Error != null)
             throw new MutationException($"al-runner server error: {response.Error}");

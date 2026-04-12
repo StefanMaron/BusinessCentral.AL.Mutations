@@ -222,6 +222,45 @@ public class PipelineTests
     }
 
     // -----------------------------------------------------------------------
+    // Run_MutationTimeoutExceeded_MarksAsTimedOut_AndContinues
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void Run_MutationTimeoutExceeded_MarksAsTimedOut_AndContinues()
+    {
+        // Baseline is instant; first mutation takes 500ms (exceeds 50ms timeout);
+        // second mutation returns instantly. Both should be recorded and the run
+        // should complete rather than hang.
+        var pipeline = new MutationPipeline(
+            new TimingFakeRunner(
+                baselineDelay: TimeSpan.Zero,
+                mutationDelay: TimeSpan.FromMilliseconds(500)),
+            operatorsPath: null);
+
+        var tempDir = CreateTempGitRepo(FixturesDir);
+        try
+        {
+            var result = pipeline.Run(new PipelineOptions
+            {
+                SourcePath = tempDir,
+                TestPath = "/dev/null",
+                MaxMutations = 2,
+                LogFilePath = Path.Combine(tempDir, "mutations.json"),
+                MutationTimeout = TimeSpan.FromMilliseconds(50),
+            });
+
+            Assert.Equal(0, result.ExitCode);
+            // At least one mutation should be TimedOut
+            Assert.Contains(result.Results, r => r.Status == MutationStatus.TimedOut);
+            // Run completed — all MaxMutations candidates should be recorded
+            Assert.Equal(2, result.Results.Count);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Replay_NotImplemented_Throws
     // -----------------------------------------------------------------------
     [Fact]
@@ -299,5 +338,31 @@ internal class SequencedFakeRunner : ITestRunner
     {
         _callCount++;
         return _callCount == 1 ? _baseline : _mutation;
+    }
+}
+
+/// <summary>
+/// A test runner that sleeps for a configurable delay to simulate slow test runs.
+/// Baseline (call 1) uses <paramref name="baselineDelay"/>; mutations use <paramref name="mutationDelay"/>.
+/// </summary>
+internal class TimingFakeRunner : ITestRunner
+{
+    private readonly TimeSpan _baselineDelay;
+    private readonly TimeSpan _mutationDelay;
+    private int _callCount;
+
+    public TimingFakeRunner(TimeSpan baselineDelay, TimeSpan mutationDelay)
+    {
+        _baselineDelay = baselineDelay;
+        _mutationDelay = mutationDelay;
+    }
+
+    public TestRunResult RunTests(string sourcePath, string testPath, string? stubsPath = null)
+    {
+        _callCount++;
+        var delay = _callCount == 1 ? _baselineDelay : _mutationDelay;
+        if (delay > TimeSpan.Zero)
+            Thread.Sleep(delay);
+        return new TestRunResult(true, new List<string>());
     }
 }

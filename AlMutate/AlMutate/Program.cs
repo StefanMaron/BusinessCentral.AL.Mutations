@@ -53,6 +53,10 @@ Options:
   --operators <path>  Path to custom operators JSON file (default: built-in 33 operators)
   --max <n>           Limit to first N mutation candidates (useful for sampling or CI)
   --log <path>        Output path for mutations.json (default: mutations.json in CWD)
+  --timeout <secs>    Per-mutation test-run time limit in seconds (default: 300).
+                      Exceeded mutations are recorded as TIMED_OUT (neutral, excluded from
+                      score) and the run continues. Set low (e.g. 15) for projects where
+                      tests are fast, to guard against mutations that cause infinite loops.
   --silent            Suppress all progress output; only errors go to stderr
 
 ### replay <log> --tests <testdir>
@@ -76,6 +80,7 @@ Exit 0 = completed. Exit 1 = error.
   KILLED        Tests detected the mutation — good, test suite is working
   SURVIVED      Tests missed the mutation — test gap, consider adding a test
   COMPILE_ERROR Mutation broke compilation — excluded from score
+  TIMED_OUT     Test run exceeded --timeout — neutral, excluded from score (likely infinite loop)
   OBSOLETE      Original source line no longer exists — stale entry, safe to ignore
 
 ## Exit Codes
@@ -205,6 +210,12 @@ var runLogOption = new Option<string?>(
     "--log",
     "Output path for the mutations.json log file (default: mutations.json in the current directory)");
 
+var runTimeoutOption = new Option<int?>(
+    "--timeout",
+    "Maximum seconds allowed for a single mutation's test run (default: 300). " +
+    "When exceeded the mutation is recorded as TIMED_OUT (neutral, excluded from score) and the run continues. " +
+    "Use a low value (e.g. 15) to guard against mutations that cause infinite loops.");
+
 var runCommand = new Command(
     "run",
     "Run full mutation testing: baseline → mutate → test → restore → report")
@@ -215,11 +226,12 @@ var runCommand = new Command(
     runOperatorsOption,
     runMaxOption,
     runLogOption,
+    runTimeoutOption,
     silentOption,
 };
 
 runCommand.SetHandler(
-    async (string source, string tests, string? stubs, string? operators, int? max, string? log, bool silent) =>
+    async (string source, string tests, string? stubs, string? operators, int? max, string? log, int? timeout, bool silent) =>
     {
         var pipeline = new MutationPipeline(new AlRunnerTestRunner(), operators);
         var result = await pipeline.RunAsync(new PipelineOptions
@@ -231,6 +243,7 @@ runCommand.SetHandler(
             OperatorsPath = operators,
             MaxMutations = max,
             LogFilePath = log,
+            MutationTimeout = TimeSpan.FromSeconds(timeout ?? 300),
             Silent = silent,
         });
 
@@ -245,6 +258,9 @@ runCommand.SetHandler(
             Console.WriteLine($"  Killed:         {result.Results.Count(r => r.Status == MutationStatus.Killed)}");
             Console.WriteLine($"  Survived:       {result.Results.Count(r => r.Status == MutationStatus.Survived)}");
             Console.WriteLine($"  Compile errors: {result.Results.Count(r => r.Status == MutationStatus.CompileError)}");
+            var timedOut = result.Results.Count(r => r.Status == MutationStatus.TimedOut);
+            if (timedOut > 0)
+                Console.WriteLine($"  Timed out:      {timedOut}");
 
             if (result.ReportMarkdown != null)
                 Console.WriteLine("  Report written: report.md");
@@ -255,7 +271,7 @@ runCommand.SetHandler(
 
         Environment.Exit(result.ExitCode);
     },
-    runSourceArg, runTestsOption, runStubsOption, runOperatorsOption, runMaxOption, runLogOption, silentOption);
+    runSourceArg, runTestsOption, runStubsOption, runOperatorsOption, runMaxOption, runLogOption, runTimeoutOption, silentOption);
 
 // ─── replay command ───────────────────────────────────────────────────────────
 

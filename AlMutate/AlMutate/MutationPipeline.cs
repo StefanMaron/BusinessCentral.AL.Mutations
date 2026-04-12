@@ -101,11 +101,42 @@ public class MutationPipeline
                 MutationStatus status;
                 string? caughtBy = null;
 
+                var shortFile = Path.GetFileName(candidate.File);
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     Mutator.Apply(candidate);
-                    var testResult = effectiveRunner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
+
+                    TestRunResult testResult;
+                    if (options.MutationTimeout.HasValue)
+                    {
+                        // Run the test on a background thread and race against a timeout.
+                        // If it times out we restore the file, mark TIMED_OUT, and continue
+                        // so the pipeline is never blocked by an infinite loop in mutated code.
+                        var testTask = Task.Run(() =>
+                            effectiveRunner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath));
+                        var timeoutTask = Task.Delay(options.MutationTimeout.Value);
+
+                        if (await Task.WhenAny(testTask, timeoutTask) == timeoutTask)
+                        {
+                            // Timed out — restore file and mark neutral
+                            sw.Stop();
+                            try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
+                            status = MutationStatus.TimedOut;
+                            var timeoutLabel = FormatElapsed(sw.Elapsed);
+                            Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → TIMED_OUT ({timeoutLabel})");
+                            results.Add(new MutationResult(id, candidate.OperatorId, candidate.File,
+                                candidate.Line, candidate.Original, candidate.Mutated, status, null));
+                            continue;
+                        }
+
+                        testResult = await testTask; // already completed — no extra wait
+                    }
+                    else
+                    {
+                        testResult = effectiveRunner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
+                    }
+
                     GitService.RestoreFile(candidate.File);
 
                     if (testResult.CompileError)
@@ -130,13 +161,10 @@ public class MutationPipeline
                     MutationStatus.Killed => "KILLED",
                     MutationStatus.Survived => "SURVIVED",
                     MutationStatus.CompileError => "COMPILE_ERROR",
+                    MutationStatus.TimedOut => "TIMED_OUT",
                     _ => status.ToString().ToUpperInvariant()
                 };
-                var shortFile = Path.GetFileName(candidate.File);
-                var elapsed = sw.Elapsed.TotalSeconds >= 1
-                    ? $"{sw.Elapsed.TotalSeconds:F1}s"
-                    : $"{sw.Elapsed.TotalMilliseconds:F0}ms";
-                Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → {statusLabel} ({elapsed})");
+                Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → {statusLabel} ({FormatElapsed(sw.Elapsed)})");
 
                 results.Add(new MutationResult(
                     id,
@@ -173,4 +201,9 @@ public class MutationPipeline
     {
         throw new NotImplementedException("Replay not yet implemented");
     }
+
+    private static string FormatElapsed(TimeSpan elapsed) =>
+        elapsed.TotalSeconds >= 1
+            ? $"{elapsed.TotalSeconds:F1}s"
+            : $"{elapsed.TotalMilliseconds:F0}ms";
 }

@@ -42,7 +42,8 @@ jobs:
             $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel/src \
             --tests $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel.Test/src \
             --stubs $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel.Test/stubs \
-            --log $GITHUB_WORKSPACE/mutations.json
+            --log $GITHUB_WORKSPACE/mutations.json \
+            --timeout 15
 
       - name: Upload mutation results
         if: always()
