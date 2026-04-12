@@ -1,0 +1,86 @@
+name: Mutation Sentinel
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_mutations:
+        description: 'Max mutations to run (use small number for quick checks)'
+        required: false
+        default: '20'
+        type: number
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout AL Runner
+        uses: actions/checkout@v4
+        with:
+          repository: StefanMaron/BusinessCentral.AL.Runner
+          path: BusinessCentral.AL.Runner
+
+      - name: Checkout BusinessCentral.Sentinel
+        uses: actions/checkout@v4
+        with:
+          repository: StefanMaron/BusinessCentral.Sentinel
+          path: Sentinel
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build al-mutate
+        run: |
+          dotnet build AlMutate/AlMutate/AlMutate.csproj \
+            -p:ALRunnerProjectPath=$GITHUB_WORKSPACE/BusinessCentral.AL.Runner/AlRunner/AlRunner.csproj
+
+      - name: Scan mutations (dry run)
+        run: |
+          dotnet run --no-build --project AlMutate/AlMutate -- scan \
+            $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel/src
+
+      - name: Run mutation pipeline
+        working-directory: ${{ github.workspace }}/Sentinel
+        run: |
+          dotnet run --no-build --project $GITHUB_WORKSPACE/AlMutate/AlMutate -- run \
+            $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel/src \
+            --tests $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel.Test/src \
+            --stubs $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel.Test/stubs \
+            --max ${{ inputs.max_mutations }} \
+            --log $GITHUB_WORKSPACE/mutations.json
+
+      - name: Upload mutation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results
+          path: |
+            mutations.json
+            report.md
+          if-no-files-found: ignore
+
+      - name: Write job summary
+        if: always() && hashFiles('mutations.json') != ''
+        run: |
+          {
+            echo "## Mutation Testing Results"
+            echo ""
+            echo "**Source:** \`BusinessCentral.Sentinel/src\`"
+            echo "**Max mutations:** ${{ inputs.max_mutations }}"
+            echo ""
+            if [ -f report.md ]; then
+              cat report.md
+            else
+              echo "_report.md not generated — check logs for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

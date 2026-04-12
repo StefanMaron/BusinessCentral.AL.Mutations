@@ -24,7 +24,7 @@ def check_prerequisites() -> None:
 def compile_project() -> bool:
     """Compile the AL project. Returns True on success."""
     result = subprocess.run(
-        ["al-compile"],
+        ["al-compile", "--analyzers", "none"],
         capture_output=True,
         text=True,
     )
@@ -33,8 +33,14 @@ def compile_project() -> bool:
 
 def publish_app() -> bool:
     """Publish the compiled app to BC. Returns True on success."""
+    bc_host = os.environ.get("BC_SERVER", "localhost")
     result = subprocess.run(
-        ["bc-publish"],
+        [
+            "bc-publish",
+            "--port", "7049",
+            "--username", "BCRUNNER",
+            "--password", "Admin123!",
+        ],
         capture_output=True,
         text=True,
     )
@@ -44,15 +50,19 @@ def publish_app() -> bool:
 def run_tests(test_app: Path) -> tuple[bool, str]:
     """Run the test suite. Returns (passed, output)."""
     bc_host = os.environ.get("BC_SERVER", "localhost")
+    env = os.environ.copy()
+    env["DOTNET_ROLL_FORWARD"] = "LatestMajor"
     result = subprocess.run(
         [
             "/opt/bc-linux/scripts/run-tests.sh",
             "--base-url", f"http://{bc_host}:7048/BC",
             "--dev-url", f"http://{bc_host}:7049/BC/dev",
+            "--auth", "BCRUNNER:Admin123!",
             "--app", str(test_app),
         ],
         capture_output=True,
         text=True,
+        env=env,
     )
     output = result.stdout + result.stderr
     return result.returncode == 0, output

@@ -1,0 +1,127 @@
+name: Publish to NuGet
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (e.g. 0.2.0)'
+        required: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout AL Runner
+        uses: actions/checkout@v4
+        with:
+          repository: StefanMaron/BusinessCentral.AL.Runner
+          path: BusinessCentral.AL.Runner
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: |
+          dotnet build AlMutate/AlMutate.slnx \
+            -p:ALRunnerProjectPath=$GITHUB_WORKSPACE/BusinessCentral.AL.Runner/AlRunner/AlRunner.csproj
+
+      - name: Run C# tests
+        run: |
+          dotnet test AlMutate/AlMutate.Tests/AlMutate.Tests.csproj \
+            --no-build \
+            --filter "Category!=Integration" \
+            --verbosity minimal
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # required by softprops/action-gh-release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout AL Runner
+        uses: actions/checkout@v4
+        with:
+          repository: StefanMaron/BusinessCentral.AL.Runner
+          path: BusinessCentral.AL.Runner
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            # Extract from tag: v0.2.0 -> 0.2.0
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { printing=1; next }
+            printing && $0 ~ "^## \\[" { exit }
+            printing { print }
+          ' CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details."
+          fi
+          {
+            echo "notes<<EOF_NOTES"
+            echo "$NOTES"
+            echo "EOF_NOTES"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and pack
+        run: |
+          dotnet build AlMutate/AlMutate/AlMutate.csproj \
+            -p:ALRunnerProjectPath=$GITHUB_WORKSPACE/BusinessCentral.AL.Runner/AlRunner/AlRunner.csproj
+          dotnet pack AlMutate/AlMutate/AlMutate.csproj \
+            --no-build \
+            -p:Version=${{ steps.version.outputs.version }} \
+            -o ./nupkg
+
+      - name: Push to NuGet
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'  # only on tag pushes, not workflow_dispatch
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.notes }}
+          files: ./nupkg/*.nupkg
+          draft: false
+          prerelease: false
+
+      - name: Summary
+        run: |
+          {
+            echo "## Published to NuGet"
+            echo ""
+            echo "**Version:** ${{ steps.version.outputs.version }}"
+            echo "**Package:** [MSDyn365BC.AL.Mutate](https://www.nuget.org/packages/MSDyn365BC.AL.Mutate/${{ steps.version.outputs.version }})"
+            echo "**Release:** [${{ github.ref_name }}](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }})"
+          } >> "$GITHUB_STEP_SUMMARY"

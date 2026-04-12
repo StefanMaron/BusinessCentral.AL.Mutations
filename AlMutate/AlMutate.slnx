@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AlMutate.Tests/AlMutate.Tests.csproj" />
+  <Project Path="AlMutate/AlMutate.csproj" />
+</Solution>

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AlMutate.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AlMutate/AlMutate.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="fixtures/**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <_ALToolVersion>16.2.28.57946</_ALToolVersion>
+    <ALCompilerPath Condition="$([MSBuild]::IsOSPlatform('Linux')) And Exists('$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any</ALCompilerPath>
+    <ALCompilerPath Condition="$([MSBuild]::IsOSPlatform('OSX')) And Exists('$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any</ALCompilerPath>
+    <ALCompilerPath Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('$(USERPROFILE)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/tools/net8.0/any/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">$(USERPROFILE)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/tools/net8.0/any</ALCompilerPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- AL Compiler — copied to output so AlScanner tests can resolve it at runtime -->
+    <Reference Include="Microsoft.Dynamics.Nav.CodeAnalysis">
+      <HintPath>$(ALCompilerPath)/Microsoft.Dynamics.Nav.CodeAnalysis.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

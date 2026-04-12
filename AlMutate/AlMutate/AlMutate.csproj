@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>al-mutate</ToolCommandName>
+    <PackageId>MSDyn365BC.AL.Mutate</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Mutation testing tool for Business Central AL code</Description>
+    <Authors>Stefan Maron</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <InternalsVisibleTo>AlMutate.Tests</InternalsVisibleTo>
+    <RootNamespace>AlMutate</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <_ALToolVersion>16.2.28.57946</_ALToolVersion>
+    <ALCompilerPath Condition="$([MSBuild]::IsOSPlatform('Linux')) And Exists('$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any</ALCompilerPath>
+    <ALCompilerPath Condition="$([MSBuild]::IsOSPlatform('OSX')) And Exists('$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">$(HOME)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools.linux/$(_ALToolVersion)/tools/net8.0/any</ALCompilerPath>
+    <ALCompilerPath Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('$(USERPROFILE)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/tools/net8.0/any/Microsoft.Dynamics.Nav.CodeAnalysis.dll')">$(USERPROFILE)/.dotnet/tools/.store/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/microsoft.dynamics.businesscentral.development.tools/$(_ALToolVersion)/tools/net8.0/any</ALCompilerPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="operators/default.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Allow CI to override the AL Runner project path via -p:ALRunnerProjectPath=... -->
+    <ALRunnerProjectPath Condition="'$(ALRunnerProjectPath)' == ''">../../../BusinessCentral.AL.Runner/AlRunner/AlRunner.csproj</ALRunnerProjectPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(ALRunnerProjectPath)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- AL Compiler — used by AlScanner. Same version as AlRunner, explicit here so DLLs are copied. -->
+    <Reference Include="Microsoft.Dynamics.Nav.CodeAnalysis">
+      <HintPath>$(ALCompilerPath)/Microsoft.Dynamics.Nav.CodeAnalysis.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis">
+      <HintPath>$(ALCompilerPath)/Microsoft.CodeAnalysis.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

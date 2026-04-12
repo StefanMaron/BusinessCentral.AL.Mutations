@@ -1,0 +1,282 @@
+{
+  "$schema": "./schema.json",
+  "operators": [
+    {
+      "id": "rel-gt-to-gte",
+      "name": "Greater-than to greater-or-equal",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": ">",
+      "replacement": ">="
+    },
+    {
+      "id": "rel-gte-to-gt",
+      "name": "Greater-or-equal to greater-than",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": ">=",
+      "replacement": ">"
+    },
+    {
+      "id": "rel-lt-to-lte",
+      "name": "Less-than to less-or-equal",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": "<",
+      "replacement": "<="
+    },
+    {
+      "id": "rel-lte-to-lt",
+      "name": "Less-or-equal to less-than",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": "<=",
+      "replacement": "<"
+    },
+    {
+      "id": "rel-eq-to-neq",
+      "name": "Equal to not-equal",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": "=",
+      "replacement": "<>"
+    },
+    {
+      "id": "rel-neq-to-eq",
+      "name": "Not-equal to equal",
+      "category": "relational",
+      "node_type": "comparison_expression",
+      "operator_token": "<>",
+      "replacement": "="
+    },
+    {
+      "id": "arith-add-to-sub",
+      "name": "Addition to subtraction",
+      "category": "arithmetic",
+      "node_type": "additive_expression",
+      "operator_token": "+",
+      "replacement": "-"
+    },
+    {
+      "id": "arith-sub-to-add",
+      "name": "Subtraction to addition",
+      "category": "arithmetic",
+      "node_type": "additive_expression",
+      "operator_token": "-",
+      "replacement": "+"
+    },
+    {
+      "id": "arith-mul-to-div",
+      "name": "Multiplication to division",
+      "category": "arithmetic",
+      "node_type": "multiplicative_expression",
+      "operator_token": "*",
+      "replacement": "/"
+    },
+    {
+      "id": "arith-div-to-mul",
+      "name": "Division to multiplication",
+      "category": "arithmetic",
+      "node_type": "multiplicative_expression",
+      "operator_token": "/",
+      "replacement": "*"
+    },
+    {
+      "id": "logic-and-to-or",
+      "name": "And to or",
+      "category": "logical",
+      "node_type": "logical_expression",
+      "operator_token": "and",
+      "replacement": "or"
+    },
+    {
+      "id": "logic-or-to-and",
+      "name": "Or to and",
+      "category": "logical",
+      "node_type": "logical_expression",
+      "operator_token": "or",
+      "replacement": "and"
+    },
+    {
+      "id": "stmt-remove-modify",
+      "name": "Remove Modify call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Modify",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-insert",
+      "name": "Remove Insert call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Insert",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-delete",
+      "name": "Remove Delete call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Delete",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-validate",
+      "name": "Remove Validate call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Validate",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-error",
+      "name": "Remove Error call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Error",
+      "replacement": null
+    },
+    {
+      "id": "bc-modify-trigger-true",
+      "name": "Modify(true) to Modify(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Modify",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-modify-trigger-false",
+      "name": "Modify(false) to Modify(true)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Modify",
+      "argument_match": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "bc-insert-trigger-true",
+      "name": "Insert(true) to Insert(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Insert",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-delete-trigger-true",
+      "name": "Delete(true) to Delete(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Delete",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bool-true-to-false",
+      "name": "True literal to false",
+      "category": "boolean",
+      "node_type": "boolean",
+      "operator_token": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bool-false-to-true",
+      "name": "False literal to true",
+      "category": "boolean",
+      "node_type": "boolean",
+      "operator_token": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "unary-remove-not",
+      "name": "Remove not negation",
+      "category": "logical",
+      "node_type": "unary_expression",
+      "operator_token": "not",
+      "replacement": null
+    },
+    {
+      "id": "exit-true-to-false",
+      "name": "exit(true) to exit(false)",
+      "category": "control-flow",
+      "node_type": "exit_statement",
+      "operator_token": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "exit-false-to-true",
+      "name": "exit(false) to exit(true)",
+      "category": "control-flow",
+      "node_type": "exit_statement",
+      "operator_token": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "stmt-remove-testfield",
+      "name": "Remove TestField call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "TestField",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-setrange",
+      "name": "Remove SetRange call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "SetRange",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-setfilter",
+      "name": "Remove SetFilter call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "SetFilter",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-commit",
+      "name": "Remove Commit call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Commit",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-init",
+      "name": "Remove Init call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Init",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-deleteall",
+      "name": "Remove DeleteAll call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "DeleteAll",
+      "replacement": null
+    },
+    {
+      "id": "bc-deleteall-trigger-true",
+      "name": "DeleteAll(true) to DeleteAll(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "DeleteAll",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-findset-to-findfirst",
+      "name": "FindSet to FindFirst",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "FindSet",
+      "identifier_replacement": "FindFirst"
+    }
+  ]
+}
