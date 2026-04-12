@@ -54,6 +54,11 @@ internal sealed class AlRunnerServer : ITestRunner, IAsyncDisposable
         return new AlRunnerServer(proc);
     }
 
+    // Per-mutation timeout: al-runner should compile + run within this window.
+    // 5 minutes is generous even for large projects; keeps CI from hanging forever
+    // if the server process deadlocks.
+    private static readonly TimeSpan ResponseTimeout = TimeSpan.FromMinutes(5);
+
     /// <summary>
     /// ITestRunner implementation — sends a runTests command to the server and
     /// maps the response to a <see cref="TestRunResult"/>.
@@ -73,11 +78,18 @@ internal sealed class AlRunnerServer : ITestRunner, IAsyncDisposable
             SourcePaths = sourcePaths.ToArray()
         });
 
-        // Send request and read response (synchronous over the async streams)
+        // Send request and read response with a timeout so a hung server
+        // cannot block the pipeline indefinitely.
         _process.StandardInput.WriteLine(request);
         _process.StandardInput.Flush();
 
-        var responseLine = _process.StandardOutput.ReadLine()
+        using var cts = new CancellationTokenSource(ResponseTimeout);
+        var readTask = _process.StandardOutput.ReadLineAsync(cts.Token).AsTask();
+        if (!readTask.Wait(ResponseTimeout))
+            throw new MutationException(
+                $"al-runner server did not respond within {ResponseTimeout.TotalMinutes:F0} minutes");
+
+        var responseLine = readTask.Result
             ?? throw new MutationException("al-runner server closed stdout before responding");
 
         ServerRunTestsResponse? response;

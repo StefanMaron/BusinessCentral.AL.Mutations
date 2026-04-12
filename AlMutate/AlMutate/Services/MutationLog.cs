@@ -8,6 +8,7 @@ public class MutationLog
 {
     private readonly string _filePath;
     private readonly MutationLogFile _data;
+    private int _nextId;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -19,6 +20,7 @@ public class MutationLog
     {
         _filePath = filePath;
         _data = data;
+        _nextId = data.Runs.Sum(r => r.Mutations.Count);
     }
 
     /// <summary>Create a new empty log for the given project path.</summary>
@@ -47,6 +49,11 @@ public class MutationLog
         var date = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss");
         var run = new MutationRun(nextRunNumber, date, results);
         _data.Runs.Add(run);
+        // Keep _nextId in sync so NextMutationId() continues the sequence correctly
+        // regardless of whether it was called before or after AppendRun.
+        var total = _data.Runs.Sum(r => r.Mutations.Count);
+        if (total > _nextId)
+            _nextId = total;
     }
 
     /// <summary>Write to disk (to the path it was loaded/created from).</summary>
@@ -68,12 +75,11 @@ public class MutationLog
             .ToList();
     }
 
-    /// <summary>Returns the next mutation ID: "M001", "M002", etc. Counts across ALL runs.</summary>
-    public string NextMutationId()
-    {
-        var total = _data.Runs.Sum(r => r.Mutations.Count);
-        return $"M{total + 1:D3}";
-    }
+    /// <summary>
+    /// Returns the next mutation ID: "M001", "M002", etc., incrementing on each call.
+    /// The counter is seeded from all existing runs so IDs are unique across the log's lifetime.
+    /// </summary>
+    public string NextMutationId() => $"M{++_nextId:D3}";
 }
 
 /// <summary>Serializes enum values as UPPERCASE strings (e.g. KILLED, COMPILE_ERROR).</summary>

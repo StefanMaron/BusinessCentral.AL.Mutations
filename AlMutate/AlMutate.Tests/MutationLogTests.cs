@@ -223,4 +223,42 @@ public class MutationLogTests : IDisposable
 
         Assert.Equal("M002", log.NextMutationId());
     }
+
+    // -----------------------------------------------------------------------
+    // NextMutationId_CalledMultipleTimes_ReturnsConsecutiveIds
+    // Regression: previously recalculated from _data.Runs every call, so all
+    // calls during a run (before AppendRun) returned M001.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void NextMutationId_CalledMultipleTimes_ReturnsConsecutiveIds()
+    {
+        var path = TempFile();
+        var log = MutationLog.Create(path, "./src");
+
+        Assert.Equal("M001", log.NextMutationId());
+        Assert.Equal("M002", log.NextMutationId());
+        Assert.Equal("M003", log.NextMutationId());
+    }
+
+    // -----------------------------------------------------------------------
+    // NextMutationId_WithExistingRunsCalledMultipleTimes_ContinuesSequence
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void NextMutationId_WithExistingRunsCalledMultipleTimes_ContinuesSequence()
+    {
+        var path = TempFile();
+        var log = MutationLog.Create(path, "./src");
+
+        log.AppendRun(new List<MutationResult>
+        {
+            new("M001", "op1", "f.al", 1, "orig", "mut", MutationStatus.Killed, null),
+            new("M002", "op1", "f.al", 2, "orig", "mut", MutationStatus.Survived, null),
+        });
+        log.Save();
+
+        var log2 = MutationLog.Load(path);
+        Assert.Equal("M003", log2.NextMutationId());
+        Assert.Equal("M004", log2.NextMutationId());
+        Assert.Equal("M005", log2.NextMutationId());
+    }
 }
