@@ -222,6 +222,50 @@ public class PipelineTests
     }
 
     // -----------------------------------------------------------------------
+    // Run_RunnerThrowsNonMutationException_MarksAsCompileError_AndContinues
+    // A runner throwing IOException (e.g. broken pipe to a crashed server)
+    // must NOT crash the pipeline — it should mark the mutation as CompileError
+    // and continue to the next candidate.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void Run_RunnerThrowsNonMutationException_MarksAsCompileError_AndContinues()
+    {
+        // Baseline passes; first mutation throws IOException; second mutation is killed.
+        var pipeline = new MutationPipeline(
+            new SequencedFakeRunner(
+                baseline: new TestRunResult(true, []),
+                mutation: new TestRunResult(false, ["SomeTest"])),
+            operatorsPath: null);
+
+        // Use a runner that throws on the first mutation call
+        var throwingPipeline = new MutationPipeline(
+            new ThrowingAfterBaselineRunner(),
+            operatorsPath: null);
+
+        var tempDir = CreateTempGitRepo(FixturesDir);
+        try
+        {
+            var result = throwingPipeline.Run(new PipelineOptions
+            {
+                SourcePath = tempDir,
+                TestPath = "/dev/null",
+                MaxMutations = 2,
+                LogFilePath = Path.Combine(tempDir, "mutations.json"),
+            });
+
+            Assert.Equal(0, result.ExitCode);
+            // The throwing mutation should be CompileError, not crash
+            Assert.Contains(result.Results, r => r.Status == MutationStatus.CompileError);
+            // Both candidates should be recorded
+            Assert.Equal(2, result.Results.Count);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Run_MutationTimeoutExceeded_MarksAsTimedOut_AndContinues
     // -----------------------------------------------------------------------
     [Fact]
@@ -338,6 +382,23 @@ internal class SequencedFakeRunner : ITestRunner
     {
         _callCount++;
         return _callCount == 1 ? _baseline : _mutation;
+    }
+}
+
+/// <summary>
+/// A test runner whose baseline passes but every mutation call throws IOException
+/// (simulates a crashed al-runner server with a broken pipe).
+/// </summary>
+internal class ThrowingAfterBaselineRunner : ITestRunner
+{
+    private int _callCount;
+
+    public TestRunResult RunTests(string sourcePath, string testPath, string? stubsPath = null)
+    {
+        _callCount++;
+        if (_callCount == 1)
+            return new TestRunResult(true, new List<string>());
+        throw new System.IO.IOException("Simulated broken pipe");
     }
 }
 

@@ -66,11 +66,12 @@ public class MutationPipeline
         //    For any other runner (e.g. FakeTestRunner in tests), use it directly.
         ITestRunner effectiveRunner = _runner;
         AlRunnerServer? server = null;
+        string? alRunnerPath = null;    // kept for server restart after timeout
 
         if (_runner is AlRunnerTestRunner)
         {
             Log("Starting al-runner server...");
-            var alRunnerPath = AlRunnerTestRunner.GetAlRunnerPath();
+            alRunnerPath = AlRunnerTestRunner.GetAlRunnerPath();
             server = await AlRunnerServer.StartAsync(alRunnerPath);
             effectiveRunner = server;
         }
@@ -119,14 +120,19 @@ public class MutationPipeline
 
                         if (await Task.WhenAny(testTask, timeoutTask) == timeoutTask)
                         {
-                            // Timed out — restore file and mark neutral
+                            // Timed out — restore file and mark neutral.
+                            // Also restart the server: the abandoned testTask is still blocking
+                            // on ReadLine from the server's stdout. If we don't restart, the
+                            // next mutation's ReadLine races with this abandoned one and the
+                            // protocol desynchronizes, causing every subsequent mutation to
+                            // time out as well.
                             sw.Stop();
+                            if (server != null && alRunnerPath != null)
+                                (server, effectiveRunner) = await RestartServerAsync(server, alRunnerPath, Log);
                             try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
-                            status = MutationStatus.TimedOut;
-                            var timeoutLabel = FormatElapsed(sw.Elapsed);
-                            Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → TIMED_OUT ({timeoutLabel})");
+                            Log($"  [{index}/{total}] {id} [{candidate.OperatorId}] {shortFile}:{candidate.Line} → TIMED_OUT ({FormatElapsed(sw.Elapsed)})");
                             results.Add(new MutationResult(id, candidate.OperatorId, candidate.File,
-                                candidate.Line, candidate.Original, candidate.Mutated, status, null));
+                                candidate.Line, candidate.Original, candidate.Mutated, MutationStatus.TimedOut, null));
                             continue;
                         }
 
@@ -153,6 +159,17 @@ public class MutationPipeline
                 {
                     try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
                     status = MutationStatus.CompileError;
+                }
+                catch (Exception ex)
+                {
+                    // Non-MutationException (e.g. IOException from a crashed server process).
+                    // Log to stderr, mark as CompileError, restart the server if applicable,
+                    // and continue — never let one bad mutation abort the whole run.
+                    Console.Error.WriteLine($"Unexpected error on {id}: {ex.GetType().Name}: {ex.Message}");
+                    try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
+                    status = MutationStatus.CompileError;
+                    if (server != null && alRunnerPath != null)
+                        (server, effectiveRunner) = await RestartServerAsync(server, alRunnerPath, Log);
                 }
                 sw.Stop();
 
@@ -206,4 +223,18 @@ public class MutationPipeline
         elapsed.TotalSeconds >= 1
             ? $"{elapsed.TotalSeconds:F1}s"
             : $"{elapsed.TotalMilliseconds:F0}ms";
+
+    /// <summary>
+    /// Kills the current al-runner server and starts a fresh one.
+    /// Called after a timeout or unexpected exception to prevent stdout/stdin
+    /// protocol desynchronization from affecting subsequent mutations.
+    /// </summary>
+    private static async Task<(AlRunnerServer Server, ITestRunner Runner)> RestartServerAsync(
+        AlRunnerServer oldServer, string alRunnerPath, Action<string> log)
+    {
+        log("Restarting al-runner server...");
+        try { await oldServer.DisposeAsync(); } catch { /* already dead */ }
+        var newServer = await AlRunnerServer.StartAsync(alRunnerPath);
+        return (newServer, newServer);
+    }
 }

@@ -81,8 +81,15 @@ internal sealed class AlRunnerServer : ITestRunner, IAsyncDisposable
         // against the test run task; if that fires first, the pipeline moves on.
         // We still use a generous server-side deadline here as a last-resort safety net
         // in case the server process hangs before the pipeline timeout can fire.
-        _process.StandardInput.WriteLine(request);
-        _process.StandardInput.Flush();
+        try
+        {
+            _process.StandardInput.WriteLine(request);
+            _process.StandardInput.Flush();
+        }
+        catch (Exception ex)
+        {
+            throw new MutationException($"al-runner server stdin write failed (process may have exited): {ex.Message}");
+        }
 
         var readTask = Task.Run(() => _process.StandardOutput.ReadLine());
         if (!readTask.Wait(ResponseTimeout))
