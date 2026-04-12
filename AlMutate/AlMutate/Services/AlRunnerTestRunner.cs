@@ -10,7 +10,7 @@ public class AlRunnerTestRunner : ITestRunner
 
     public TestRunResult RunTests(string sourcePath, string testPath, string? stubsPath = null)
     {
-        var alRunnerPath = EnsureAlRunnerInstalled();
+        var alRunnerPath = GetAlRunnerPath();
 
         // Build the file list: find all *.al files in each directory
         var alFiles = new List<string>();
@@ -58,7 +58,10 @@ public class AlRunnerTestRunner : ITestRunner
     /// <summary>
     /// Returns the path to the al-runner executable, installing it if necessary.
     /// Uses the full path after install to avoid PATH refresh issues.
+    /// Exposed as internal so <see cref="AlRunnerServer"/> can reuse the same resolution logic.
     /// </summary>
+    internal static string GetAlRunnerPath() => EnsureAlRunnerInstalled();
+
     private static string EnsureAlRunnerInstalled()
     {
         // Try al-runner on PATH first (already installed)

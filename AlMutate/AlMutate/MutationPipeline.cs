@@ -36,8 +36,17 @@ public class MutationPipeline
 
     /// <summary>
     /// Full mutation testing run: check git clean, baseline, mutate, report.
+    /// Uses al-runner server mode for incremental compilation when the runner
+    /// is <see cref="AlRunnerTestRunner"/>, keeping compiled assemblies warm
+    /// between mutations so only changed files re-transpile.
     /// </summary>
     public PipelineResult Run(PipelineOptions options)
+        => RunAsync(options).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Async implementation of <see cref="Run"/>.
+    /// </summary>
+    public async Task<PipelineResult> RunAsync(PipelineOptions options)
     {
         // 1. Check git clean (relative to the source directory)
         if (!GitService.IsWorkingTreeClean(options.SourcePath))
@@ -48,67 +57,88 @@ public class MutationPipeline
         if (options.MaxMutations.HasValue)
             candidates = candidates.Take(options.MaxMutations.Value).ToList();
 
-        // 3. Run baseline
-        var baseline = _runner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
-        if (!baseline.Passed && !baseline.CompileError)
-            return new PipelineResult(1, new List<MutationResult>(), 0.0, null, "Baseline tests failed");
+        // 3. Resolve the effective runner: use server mode when runner is AlRunnerTestRunner
+        //    for incremental compilation (cache hit on unchanged files).
+        //    For any other runner (e.g. FakeTestRunner in tests), use it directly.
+        ITestRunner effectiveRunner = _runner;
+        AlRunnerServer? server = null;
 
-        // 4. Load or create log
-        var logPath = options.LogFilePath ?? "mutations.json";
-        var log = File.Exists(logPath)
-            ? MutationLog.Load(logPath)
-            : MutationLog.Create(logPath, options.SourcePath);
-
-        // 5. Run each mutation
-        var results = new List<MutationResult>();
-        foreach (var candidate in candidates)
+        if (_runner is AlRunnerTestRunner)
         {
-            var id = log.NextMutationId();
-            MutationStatus status;
-            string? caughtBy = null;
-
-            try
-            {
-                Mutator.Apply(candidate);
-                var testResult = _runner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
-                GitService.RestoreFile(candidate.File);
-
-                if (testResult.CompileError)
-                    status = MutationStatus.CompileError;
-                else if (testResult.Passed)
-                    status = MutationStatus.Survived;
-                else
-                {
-                    status = MutationStatus.Killed;
-                    caughtBy = testResult.FailedTests.FirstOrDefault();
-                }
-            }
-            catch (MutationException)
-            {
-                try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
-                status = MutationStatus.CompileError;
-            }
-
-            results.Add(new MutationResult(
-                id,
-                candidate.OperatorId,
-                candidate.File,
-                candidate.Line,
-                candidate.Original,
-                candidate.Mutated,
-                status,
-                caughtBy));
+            var alRunnerPath = AlRunnerTestRunner.GetAlRunnerPath();
+            server = await AlRunnerServer.StartAsync(alRunnerPath);
+            effectiveRunner = server;
         }
 
-        // 6. Append run and save log
-        log.AppendRun(results);
-        log.Save();
+        try
+        {
+            // 4. Run baseline
+            var baseline = effectiveRunner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
+            if (!baseline.Passed && !baseline.CompileError)
+                return new PipelineResult(1, new List<MutationResult>(), 0.0, null, "Baseline tests failed");
 
-        // 7. Generate report
-        var score = ReportGenerator.CalculateScore(results);
-        var report = ReportGenerator.GenerateMarkdown(results, options.SourcePath);
+            // 5. Load or create log
+            var logPath = options.LogFilePath ?? "mutations.json";
+            var log = File.Exists(logPath)
+                ? MutationLog.Load(logPath)
+                : MutationLog.Create(logPath, options.SourcePath);
 
-        return new PipelineResult(0, results, score, report);
+            // 6. Run each mutation
+            var results = new List<MutationResult>();
+            foreach (var candidate in candidates)
+            {
+                var id = log.NextMutationId();
+                MutationStatus status;
+                string? caughtBy = null;
+
+                try
+                {
+                    Mutator.Apply(candidate);
+                    var testResult = effectiveRunner.RunTests(options.SourcePath, options.TestPath!, options.StubsPath);
+                    GitService.RestoreFile(candidate.File);
+
+                    if (testResult.CompileError)
+                        status = MutationStatus.CompileError;
+                    else if (testResult.Passed)
+                        status = MutationStatus.Survived;
+                    else
+                    {
+                        status = MutationStatus.Killed;
+                        caughtBy = testResult.FailedTests.FirstOrDefault();
+                    }
+                }
+                catch (MutationException)
+                {
+                    try { GitService.RestoreFile(candidate.File); } catch { /* best effort */ }
+                    status = MutationStatus.CompileError;
+                }
+
+                results.Add(new MutationResult(
+                    id,
+                    candidate.OperatorId,
+                    candidate.File,
+                    candidate.Line,
+                    candidate.Original,
+                    candidate.Mutated,
+                    status,
+                    caughtBy));
+            }
+
+            // 7. Append run and save log
+            log.AppendRun(results);
+            log.Save();
+
+            // 8. Generate report
+            var score = ReportGenerator.CalculateScore(results);
+            var report = ReportGenerator.GenerateMarkdown(results, options.SourcePath);
+
+            return new PipelineResult(0, results, score, report);
+        }
+        finally
+        {
+            if (server != null)
+                await server.DisposeAsync();
+        }
     }
 
     /// <summary>

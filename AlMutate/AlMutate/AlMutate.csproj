@@ -12,6 +12,13 @@
     <Authors>Stefan Maron</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <InternalsVisibleTo>AlMutate.Tests</InternalsVisibleTo>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AlMutate.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <PropertyGroup>
     <RootNamespace>AlMutate</RootNamespace>
   </PropertyGroup>
 
