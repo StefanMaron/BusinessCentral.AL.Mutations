@@ -261,13 +261,18 @@ runCommand.SetHandler(
             var timedOut = result.Results.Count(r => r.Status == MutationStatus.TimedOut);
             if (timedOut > 0)
                 Console.WriteLine($"  Timed out:      {timedOut}");
-
-            if (result.ReportMarkdown != null)
-                Console.WriteLine("  Report written: report.md");
         }
 
         if (result.ReportMarkdown != null)
-            File.WriteAllText("report.md", result.ReportMarkdown);
+        {
+            // Write report.md next to mutations.json so both files are always together
+            var reportPath = log != null
+                ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(log))!, "report.md")
+                : "report.md";
+            File.WriteAllText(reportPath, result.ReportMarkdown);
+            if (!silent)
+                Console.WriteLine($"  Report written: {reportPath}");
+        }
 
         Environment.Exit(result.ExitCode);
     },

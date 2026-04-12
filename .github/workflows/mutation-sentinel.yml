@@ -59,14 +59,17 @@ jobs:
         if: always() && hashFiles('mutations.json') != ''
         run: |
           {
-            echo "## Mutation Testing Results"
+            echo "## Mutation Testing — BusinessCentral.Sentinel"
             echo ""
-            echo "**Source:** \`BusinessCentral.Sentinel/src\`"
-            echo "**Source:** Full run (no limit)"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Source** | \`BusinessCentral.Sentinel/src\` |"
+            echo "| **Run** | Full (no --max limit) |"
+            echo "| **Timeout** | 15s per mutation |"
             echo ""
             if [ -f report.md ]; then
               cat report.md
             else
-              echo "_report.md not generated — check logs for details._"
+              echo "_report.md not found — run may have failed before completing._"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
