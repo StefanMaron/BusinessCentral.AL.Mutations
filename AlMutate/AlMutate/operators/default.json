@@ -49,6 +49,7 @@
       "operator_token": "<>",
       "replacement": "="
     },
+
     {
       "id": "arith-add-to-sub",
       "name": "Addition to subtraction",
@@ -83,6 +84,23 @@
       "replacement": "*"
     },
     {
+      "id": "arith-mod-to-div",
+      "name": "Mod to div",
+      "category": "arithmetic",
+      "node_type": "multiplicative_expression",
+      "operator_token": "mod",
+      "replacement": "div"
+    },
+    {
+      "id": "arith-div-to-mod",
+      "name": "Div to mod",
+      "category": "arithmetic",
+      "node_type": "multiplicative_expression",
+      "operator_token": "div",
+      "replacement": "mod"
+    },
+
+    {
       "id": "logic-and-to-or",
       "name": "And to or",
       "category": "logical",
@@ -98,6 +116,49 @@
       "operator_token": "or",
       "replacement": "and"
     },
+    {
+      "id": "unary-remove-not",
+      "name": "Remove not negation",
+      "category": "logical",
+      "node_type": "unary_expression",
+      "operator_token": "not",
+      "replacement": null
+    },
+
+    {
+      "id": "bool-true-to-false",
+      "name": "True literal to false",
+      "category": "boolean",
+      "node_type": "boolean",
+      "operator_token": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bool-false-to-true",
+      "name": "False literal to true",
+      "category": "boolean",
+      "node_type": "boolean",
+      "operator_token": "false",
+      "replacement": "true"
+    },
+
+    {
+      "id": "exit-true-to-false",
+      "name": "exit(true) to exit(false)",
+      "category": "control-flow",
+      "node_type": "exit_statement",
+      "operator_token": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "exit-false-to-true",
+      "name": "exit(false) to exit(true)",
+      "category": "control-flow",
+      "node_type": "exit_statement",
+      "operator_token": "false",
+      "replacement": "true"
+    },
+
     {
       "id": "stmt-remove-modify",
       "name": "Remove Modify call",
@@ -137,82 +198,6 @@
       "node_type": "call_expression",
       "identifier": "Error",
       "replacement": null
-    },
-    {
-      "id": "bc-modify-trigger-true",
-      "name": "Modify(true) to Modify(false)",
-      "category": "bc-specific",
-      "node_type": "call_expression",
-      "identifier": "Modify",
-      "argument_match": "true",
-      "replacement": "false"
-    },
-    {
-      "id": "bc-modify-trigger-false",
-      "name": "Modify(false) to Modify(true)",
-      "category": "bc-specific",
-      "node_type": "call_expression",
-      "identifier": "Modify",
-      "argument_match": "false",
-      "replacement": "true"
-    },
-    {
-      "id": "bc-insert-trigger-true",
-      "name": "Insert(true) to Insert(false)",
-      "category": "bc-specific",
-      "node_type": "call_expression",
-      "identifier": "Insert",
-      "argument_match": "true",
-      "replacement": "false"
-    },
-    {
-      "id": "bc-delete-trigger-true",
-      "name": "Delete(true) to Delete(false)",
-      "category": "bc-specific",
-      "node_type": "call_expression",
-      "identifier": "Delete",
-      "argument_match": "true",
-      "replacement": "false"
-    },
-    {
-      "id": "bool-true-to-false",
-      "name": "True literal to false",
-      "category": "boolean",
-      "node_type": "boolean",
-      "operator_token": "true",
-      "replacement": "false"
-    },
-    {
-      "id": "bool-false-to-true",
-      "name": "False literal to true",
-      "category": "boolean",
-      "node_type": "boolean",
-      "operator_token": "false",
-      "replacement": "true"
-    },
-    {
-      "id": "unary-remove-not",
-      "name": "Remove not negation",
-      "category": "logical",
-      "node_type": "unary_expression",
-      "operator_token": "not",
-      "replacement": null
-    },
-    {
-      "id": "exit-true-to-false",
-      "name": "exit(true) to exit(false)",
-      "category": "control-flow",
-      "node_type": "exit_statement",
-      "operator_token": "true",
-      "replacement": "false"
-    },
-    {
-      "id": "exit-false-to-true",
-      "name": "exit(false) to exit(true)",
-      "category": "control-flow",
-      "node_type": "exit_statement",
-      "operator_token": "false",
-      "replacement": "true"
     },
     {
       "id": "stmt-remove-testfield",
@@ -263,6 +248,149 @@
       "replacement": null
     },
     {
+      "id": "stmt-remove-transferfields",
+      "name": "Remove TransferFields call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "TransferFields",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-calcfields",
+      "name": "Remove CalcFields call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "CalcFields",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-calcsums",
+      "name": "Remove CalcSums call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "CalcSums",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-reset",
+      "name": "Remove Reset call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Reset",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-get",
+      "name": "Remove Get call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Get",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-modifyall",
+      "name": "Remove ModifyAll call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "ModifyAll",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-rename",
+      "name": "Remove Rename call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Rename",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-message",
+      "name": "Remove Message call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "Message",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-setcurrentkey",
+      "name": "Remove SetCurrentKey call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "SetCurrentKey",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-setascending",
+      "name": "Remove SetAscending call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "SetAscending",
+      "replacement": null
+    },
+    {
+      "id": "stmt-remove-locktable",
+      "name": "Remove LockTable call",
+      "category": "statement-removal",
+      "node_type": "call_expression",
+      "identifier": "LockTable",
+      "replacement": null
+    },
+
+    {
+      "id": "bc-modify-trigger-true",
+      "name": "Modify(true) to Modify(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Modify",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-modify-trigger-false",
+      "name": "Modify(false) to Modify(true)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Modify",
+      "argument_match": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "bc-insert-trigger-true",
+      "name": "Insert(true) to Insert(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Insert",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-insert-trigger-false",
+      "name": "Insert(false) to Insert(true)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Insert",
+      "argument_match": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "bc-delete-trigger-true",
+      "name": "Delete(true) to Delete(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Delete",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-delete-trigger-false",
+      "name": "Delete(false) to Delete(true)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "Delete",
+      "argument_match": "false",
+      "replacement": "true"
+    },
+    {
       "id": "bc-deleteall-trigger-true",
       "name": "DeleteAll(true) to DeleteAll(false)",
       "category": "bc-specific",
@@ -272,11 +400,62 @@
       "replacement": "false"
     },
     {
+      "id": "bc-deleteall-trigger-false",
+      "name": "DeleteAll(false) to DeleteAll(true)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "DeleteAll",
+      "argument_match": "false",
+      "replacement": "true"
+    },
+    {
+      "id": "bc-modifyall-trigger-true",
+      "name": "ModifyAll(true) to ModifyAll(false)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "ModifyAll",
+      "argument_match": "true",
+      "replacement": "false"
+    },
+    {
+      "id": "bc-modifyall-trigger-false",
+      "name": "ModifyAll(false) to ModifyAll(true)",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "ModifyAll",
+      "argument_match": "false",
+      "replacement": "true"
+    },
+    {
       "id": "bc-findset-to-findfirst",
       "name": "FindSet to FindFirst",
       "category": "bc-specific",
       "node_type": "call_expression",
       "identifier": "FindSet",
+      "identifier_replacement": "FindFirst"
+    },
+    {
+      "id": "bc-findset-to-findlast",
+      "name": "FindSet to FindLast",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "FindSet",
+      "identifier_replacement": "FindLast"
+    },
+    {
+      "id": "bc-findfirst-to-findlast",
+      "name": "FindFirst to FindLast",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "FindFirst",
+      "identifier_replacement": "FindLast"
+    },
+    {
+      "id": "bc-findlast-to-findfirst",
+      "name": "FindLast to FindFirst",
+      "category": "bc-specific",
+      "node_type": "call_expression",
+      "identifier": "FindLast",
       "identifier_replacement": "FindFirst"
     }
   ]
