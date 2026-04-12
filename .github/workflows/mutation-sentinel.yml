@@ -2,12 +2,6 @@ name: Mutation Sentinel
 
 on:
   workflow_dispatch:
-    inputs:
-      max_mutations:
-        description: 'Max mutations to run (use small number for quick checks)'
-        required: false
-        default: '20'
-        type: number
 
 env:
   DOTNET_NOLOGO: true
@@ -56,7 +50,6 @@ jobs:
             $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel/src \
             --tests $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel.Test/src \
             --stubs $GITHUB_WORKSPACE/Sentinel/BusinessCentral.Sentinel.Test/stubs \
-            --max ${{ inputs.max_mutations }} \
             --log $GITHUB_WORKSPACE/mutations.json
 
       - name: Upload mutation results
@@ -76,7 +69,7 @@ jobs:
             echo "## Mutation Testing Results"
             echo ""
             echo "**Source:** \`BusinessCentral.Sentinel/src\`"
-            echo "**Max mutations:** ${{ inputs.max_mutations }}"
+            echo "**Source:** Full run (no limit)"
             echo ""
             if [ -f report.md ]; then
               cat report.md
