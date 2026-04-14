@@ -81,9 +81,10 @@ jobs:
 
       - name: Build and pack
         run: |
-          dotnet build AlMutate/AlMutate/AlMutate.csproj
+          dotnet build AlMutate/AlMutate/AlMutate.csproj -c Release
           dotnet pack AlMutate/AlMutate/AlMutate.csproj \
             --no-build \
+            -c Release \
             -p:Version=${{ steps.version.outputs.version }} \
             -o ./nupkg
 
