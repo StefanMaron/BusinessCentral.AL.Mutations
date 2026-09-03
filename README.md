@@ -1,6 +1,47 @@
-# al-mutate
+# al-mutate (retired)
 
-Mutation testing for Microsoft Dynamics 365 Business Central AL code.
+> **This project is retired and no longer maintained.** Use
+> [LethAL](https://github.com/SShadowS/LethAL) instead. The NuGet package
+> `MSDyn365BC.AL.Mutate` 0.2.0 stays installable, and it is not getting further releases.
+
+## Why
+
+LethAL does the same job and does it better in the places that decide whether a mutation
+testing run on a real AL project is usable at all:
+
+- **One published build carries every mutant**, each one behind a runtime guard, switched on by a
+  table write. al-mutate compiles and runs the suite once per mutant, which is what makes it
+  impractical past a few hundred mutants. LethAL has been measured against a commercial extension
+  with 19,832 mutation sites; al-mutate has no comparable measurement.
+- **It mutates a scratch copy**, not your working tree. al-mutate edits your files and restores them
+  with `git checkout`, so a crash mid-run leaves mutated source behind.
+- **It reports a third verdict, `no-coverage`**, and records how it decided. al-mutate reports only
+  killed and survived, so "your test ran this and did not check it" and "no test runs this at all"
+  are indistinguishable in its output, and the second one is not a test-quality finding.
+- **It refuses to record a verdict it cannot vouch for** — it verifies the build under test is the
+  one it compiled, holds a lease so two runs on one server cannot corrupt each other's results, and
+  reports an error where al-mutate would report a score.
+
+On mutation operators, al-mutate's 54 count against LethAL's 26 is misleading. 22 of mine are
+`stmt-remove-*` variants that LethAL covers with one generic operator, and my six arithmetic
+operators are the weaker answer to a problem LethAL measured: AL's `+` is mostly string
+concatenation, and only 8.9% of arithmetic sites in a real app are safe to mutate at all.
+
+## What was worth keeping
+
+Two things from here have been offered upstream:
+
+- The run-trigger flag swap on `DeleteAll(true)` and `ModifyAll(true)`, which LethAL does not claim.
+- `AlScanner.cs`, which enumerates mutation sites from `Microsoft.Dynamics.Nav.CodeAnalysis` (the AL
+  compiler's own parser). LethAL parses with tree-sitter-al, so this is usable as a one-off
+  cross-check for grammar blind spots.
+
+Test execution here runs through [AL Runner](https://github.com/StefanMaron/BusinessCentral.AL.Runner),
+which is actively maintained and unaffected by this. LethAL can use it as an offline backend.
+
+---
+
+The original documentation follows, unchanged.
 
 ## What Is This?
 
@@ -42,6 +83,8 @@ Operators target specific AST node types:
 33 operators across 8 categories. Custom operators can be defined in JSON. See [Operators Guide](docs/OPERATORS.md).
 
 ## Installation
+
+The package is not getting further releases. 0.2.0 remains installable:
 
 ```bash
 dotnet tool install --global MSDyn365BC.AL.Mutate

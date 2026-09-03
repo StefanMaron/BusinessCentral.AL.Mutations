@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Deprecated
+- This project is retired. Use [LethAL](https://github.com/SShadowS/LethAL) instead. No further
+  releases are planned; see README.md for why and for what was offered upstream.
+
 ## [0.2.0] - 2026-04-14
 
 ### Added
